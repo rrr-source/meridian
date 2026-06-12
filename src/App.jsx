@@ -14,8 +14,18 @@ const TABS = [
 
 export default function App() {
   const [tab, setTab] = useState("compare");
+  // Modes are kept mounted once visited so their in-memory state (Compare's
+  // countries/charts, Relocate's weights/ranking, Quiz's score/round) survives tab
+  // switches. We lazy-mount on first visit so each mode's charts first measure while
+  // visible (recharts can't size inside a display:none panel), then stay alive.
+  const [visited, setVisited] = useState(() => new Set([tab]));
   const [countries, setCountries] = useState([]);
   const [error, setError] = useState(null);
+
+  const selectTab = (id) => {
+    setTab(id);
+    setVisited((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  };
 
   // Load the country list once; every mode reuses it.
   useEffect(() => {
@@ -45,7 +55,7 @@ export default function App() {
                 <button
                   key={tb.id}
                   type="button"
-                  onClick={() => setTab(tb.id)}
+                  onClick={() => selectTab(tb.id)}
                   aria-current={active ? "page" : undefined}
                   className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                     active ? "bg-accent text-white" : "text-slate-300 hover:bg-white/10 hover:text-white"
@@ -64,12 +74,20 @@ export default function App() {
           <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {t("state.error")} {error}
           </p>
-        ) : tab === "compare" ? (
-          <Compare countries={countries} />
-        ) : tab === "relocate" ? (
-          <Relocate countries={countries} />
         ) : (
-          <Quiz countries={countries} />
+          // All visited modes stay mounted; only the active one is shown. Hiding
+          // (vs. unmounting) is what preserves each mode's state across switches.
+          <>
+            <div hidden={tab !== "compare"}>
+              {visited.has("compare") && <Compare countries={countries} />}
+            </div>
+            <div hidden={tab !== "relocate"}>
+              {visited.has("relocate") && <Relocate countries={countries} />}
+            </div>
+            <div hidden={tab !== "quiz"}>
+              {visited.has("quiz") && <Quiz countries={countries} />}
+            </div>
+          </>
         )}
       </main>
     </div>

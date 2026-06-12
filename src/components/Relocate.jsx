@@ -21,11 +21,27 @@ export default function Relocate({ countries }) {
   const [selected, setSelected] = useState(() => new Set(CRITERIA.map((c) => c.key)));
   const [weights, setWeights] = useState(() => Object.fromEntries(CRITERIA.map((c) => [c.key, DEFAULT_WEIGHT])));
   const [cache, setCache] = useState({}); // key -> raw WB rows (loaded once per indicator)
+  const [region, setRegion] = useState("all"); // "all" or a WB region.value
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const byId = useMemo(() => new Map(countries.map((c) => [c.id, c])), [countries]);
   const validCodes = useMemo(() => new Set(countries.map((c) => c.id)), [countries]);
+
+  // Distinct WB regions present in the loaded list (aggregates already removed
+  // upstream), alphabetical. Region data ships with the country list — no new fetch.
+  const regions = useMemo(
+    () => [...new Set(countries.map((c) => c.region).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [countries]
+  );
+
+  // The candidate codes the ranking is computed over. "all" = every country (today's
+  // global behavior); otherwise only countries in the chosen region — so the
+  // normalize/winsorize bounds below are recomputed within the region.
+  const regionCodes = useMemo(() => {
+    if (region === "all") return validCodes;
+    return new Set(countries.filter((c) => c.region === region).map((c) => c.id));
+  }, [region, countries, validCodes]);
 
   // Load latest values (mrnev=1) for any selected-but-uncached indicator.
   useEffect(() => {
@@ -62,17 +78,19 @@ export default function Relocate({ countries }) {
     if (activeKeys.length === 0) return null;
     if (!countries.length || activeKeys.some((k) => !cache[k])) return undefined;
 
+    // Filter candidates to the selected region BEFORE normalizing, so p5/p95 and
+    // the min-max stretch are relative to the region, not the world.
     const valueMaps = {};
     for (const k of activeKeys) {
       const m = new Map();
       for (const r of cache[k]) {
-        if (r.value != null && validCodes.has(r.countryiso3code)) m.set(r.countryiso3code, r.value);
+        if (r.value != null && regionCodes.has(r.countryiso3code)) m.set(r.countryiso3code, r.value);
       }
       valueMaps[k] = m;
     }
     const activeIndicators = activeKeys.map((k) => INDICATORS[k]);
     return computeRanking(activeIndicators, weights, valueMaps);
-  }, [selected, weights, cache, validCodes, countries.length]);
+  }, [selected, weights, cache, regionCodes, countries.length]);
 
   const toggle = (key) =>
     setSelected((prev) => {
@@ -85,6 +103,25 @@ export default function Relocate({ countries }) {
 
   return (
     <div className="space-y-6">
+      {/* Region filter — ranks within one WB region (or all). */}
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <label className="flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium text-slate-500">{t("relocate.region")}</span>
+          <select
+            value={region}
+            onChange={(e) => setRegion(e.target.value)}
+            className="ml-auto min-w-0 max-w-full rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <option value="all">{t("relocate.allRegions")}</option>
+            {regions.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </label>
+      </section>
+
       {/* Criteria chips */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-medium text-slate-500">{t("relocate.criteria")}</h2>

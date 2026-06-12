@@ -33,6 +33,8 @@ const messages = {
     "compare.removeChart": "Remove this chart",
     "compare.picked": "Already charted",
 
+    "relocate.region": "Region",
+    "relocate.allRegions": "All regions",
     "relocate.criteria": "Criteria",
     "relocate.weight": "weight",
     "relocate.ranking": "Best matches",

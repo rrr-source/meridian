@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { t } from "../lib/i18n";
 import { countryLabel } from "../lib/countries";
 import { fetchLatestAll } from "../lib/api";
-import { INDICATORS, ACCENT } from "../lib/constants";
+import { INDICATORS, ACCENT, END_YEAR } from "../lib/constants";
 import { computeRanking } from "../lib/ranking";
 
 // Criteria offered as toggle chips. Each maps to an indicator key.
@@ -16,12 +16,31 @@ const CRITERIA = [
 const DEFAULT_WEIGHT = 50;
 const TOP_N = 15;
 
+// Recency windows, in years back from the freshest possible data year (END_YEAR,
+// dynamic). mrnev returns values from different years per country; this lets the
+// user require recent data instead of silently mixing stale and fresh figures.
+const RECENCY_OPTIONS = [
+  { key: "3", years: 3 },
+  { key: "5", years: 5 },
+  { key: "10", years: 10 },
+  { key: "all", years: null },
+];
+const DEFAULT_RECENCY = "5";
+
+// Oldest data year a window still admits (inclusive); null = no limit ("All time").
+function recencyCutoff(key) {
+  const opt = RECENCY_OPTIONS.find((o) => o.key === key);
+  if (!opt || opt.years == null) return null;
+  return END_YEAR - opt.years + 1;
+}
+
 export default function Relocate({ countries }) {
   // Default selection: all five criteria active, equal weight — a broad index.
   const [selected, setSelected] = useState(() => new Set(CRITERIA.map((c) => c.key)));
   const [weights, setWeights] = useState(() => Object.fromEntries(CRITERIA.map((c) => [c.key, DEFAULT_WEIGHT])));
   const [cache, setCache] = useState({}); // key -> raw WB rows (loaded once per indicator)
   const [region, setRegion] = useState("all"); // "all" or a WB region.value
+  const [recency, setRecency] = useState(DEFAULT_RECENCY); // RECENCY_OPTIONS key
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -78,19 +97,49 @@ export default function Relocate({ countries }) {
     if (activeKeys.length === 0) return null;
     if (!countries.length || activeKeys.some((k) => !cache[k])) return undefined;
 
-    // Filter candidates to the selected region BEFORE normalizing, so p5/p95 and
-    // the min-max stretch are relative to the region, not the world.
+    // Per region: collect each country's value and the YEAR it comes from (mrnev's
+    // date). A country's "data year" is the OLDEST year across its selected criteria
+    // — worst-case freshness.
     const valueMaps = {};
+    const dataYear = new Map(); // code -> oldest selected-criterion year
     for (const k of activeKeys) {
       const m = new Map();
       for (const r of cache[k]) {
-        if (r.value != null && regionCodes.has(r.countryiso3code)) m.set(r.countryiso3code, r.value);
+        if (r.value == null || !regionCodes.has(r.countryiso3code)) continue;
+        m.set(r.countryiso3code, r.value);
+        const year = Number(r.date);
+        if (Number.isFinite(year)) {
+          const prev = dataYear.get(r.countryiso3code);
+          if (prev == null || year < prev) dataYear.set(r.countryiso3code, year);
+        }
       }
       valueMaps[k] = m;
     }
+
+    // Recency filter: drop countries whose data year is older than the cutoff BEFORE
+    // normalizing, so p5/p95 recompute over countries passing BOTH region & recency.
+    const cutoff = recencyCutoff(recency);
+    if (cutoff != null) {
+      for (const k of activeKeys) {
+        const m = valueMaps[k];
+        for (const code of [...m.keys()]) {
+          const y = dataYear.get(code);
+          if (y == null || y < cutoff) m.delete(code);
+        }
+      }
+    }
+
     const activeIndicators = activeKeys.map((k) => INDICATORS[k]);
-    return computeRanking(activeIndicators, weights, valueMaps);
-  }, [selected, weights, cache, regionCodes, countries.length]);
+    const result = computeRanking(activeIndicators, weights, valueMaps);
+    return result.map((row) => ({ ...row, year: dataYear.get(row.code) ?? null }));
+  }, [selected, weights, cache, regionCodes, recency, countries.length]);
+
+  const recencyYears = RECENCY_OPTIONS.find((o) => o.key === recency)?.years ?? null;
+  const recencyCaption =
+    recencyYears == null
+      ? t("relocate.recencyCaptionAll")
+      : t("relocate.recencyCaption", { n: recencyYears });
+  const someWeight = [...selected].some((k) => (weights[k] ?? 0) > 0);
 
   const toggle = (key) =>
     setSelected((prev) => {
@@ -103,23 +152,41 @@ export default function Relocate({ countries }) {
 
   return (
     <div className="space-y-6">
-      {/* Region filter — ranks within one WB region (or all). */}
+      {/* Region + recency filters. */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <label className="flex flex-wrap items-center gap-3">
-          <span className="text-sm font-medium text-slate-500">{t("relocate.region")}</span>
-          <select
-            value={region}
-            onChange={(e) => setRegion(e.target.value)}
-            className="ml-auto min-w-0 max-w-full rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            <option value="all">{t("relocate.allRegions")}</option>
-            {regions.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <label className="flex flex-1 items-center gap-3">
+            <span className="text-sm font-medium text-slate-500">{t("relocate.region")}</span>
+            <select
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="ml-auto min-w-0 max-w-full rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <option value="all">{t("relocate.allRegions")}</option>
+              {regions.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-1 items-center gap-3">
+            <span className="text-sm font-medium text-slate-500">{t("relocate.recency")}</span>
+            <select
+              value={recency}
+              onChange={(e) => setRecency(e.target.value)}
+              className="ml-auto min-w-0 max-w-full rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              {RECENCY_OPTIONS.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {t(`relocate.recencyOption.${o.key}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">{recencyCaption}</p>
       </section>
 
       {/* Criteria chips */}
@@ -184,7 +251,9 @@ export default function Relocate({ countries }) {
         ) : ranking === undefined || loading ? (
           <p className="mt-4 text-sm text-slate-500">{t("state.loading")}</p>
         ) : ranking.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500">{t("relocate.zeroWeightHint")}</p>
+          <p className="mt-4 text-sm text-slate-500">
+            {someWeight ? t("relocate.noMatch") : t("relocate.zeroWeightHint")}
+          </p>
         ) : (
           <ol className="mt-4 space-y-3">
             {ranking.slice(0, TOP_N).map((row, i) => {
@@ -194,8 +263,13 @@ export default function Relocate({ countries }) {
                   <span className="num w-6 shrink-0 text-right text-sm text-slate-500">{i + 1}</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="truncate text-sm text-slate-900">
-                        {country ? countryLabel(country) : row.code}
+                      <span className="flex min-w-0 items-baseline gap-2">
+                        <span className="truncate text-sm text-slate-900">
+                          {country ? countryLabel(country) : row.code}
+                        </span>
+                        {row.year != null && (
+                          <span className="num shrink-0 text-xs text-slate-400">{row.year}</span>
+                        )}
                       </span>
                       <span className="num text-sm font-semibold text-slate-900">{row.index.toFixed(1)}</span>
                     </div>

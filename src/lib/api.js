@@ -3,9 +3,10 @@
 const BASE = "https://api.worldbank.org/v2";
 
 // Every WB response is an array [meta, data], or [{message:[...]}] on error.
-// The records live in the SECOND element; this helper parses that shape.
-async function wbFetch(path) {
-  const res = await fetch(`${BASE}${path}`);
+// The records live in the SECOND element; this helper parses that shape. An
+// optional AbortSignal lets callers cancel in-flight requests (rejects AbortError).
+async function wbFetch(path, { signal } = {}) {
+  const res = await fetch(`${BASE}${path}`, { signal });
   if (!res.ok) throw new Error(`World Bank API error: ${res.status}`);
 
   const json = await res.json();
@@ -30,11 +31,12 @@ export async function fetchCountries() {
 }
 
 // Time series for one or more countries (ISO-3 codes) and one indicator.
-// Multiple countries go in a single request, separated by ";".
-export async function fetchSeries(codes, indicatorCode, start = "", end = "") {
+// Multiple countries go in a single request, separated by ";". Pass an AbortSignal
+// to cancel the request when the selection changes before it resolves.
+export async function fetchSeries(codes, indicatorCode, start = "", end = "", signal) {
   const list = Array.isArray(codes) ? codes.join(";") : codes;
   const date = start && end ? `&date=${start}:${end}` : "";
-  return wbFetch(`/country/${list}/indicator/${indicatorCode}?format=json${date}&per_page=700`);
+  return wbFetch(`/country/${list}/indicator/${indicatorCode}?format=json${date}&per_page=700`, { signal });
 }
 
 // Most recent non-empty value for an indicator across ALL countries (mrnev=1).

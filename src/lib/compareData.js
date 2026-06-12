@@ -35,23 +35,47 @@ export function initCountrySet(codes) {
   return codes.reduce((set, code) => addCountry(set, code), []);
 }
 
-// Fold WB rows for N countries into recharts data: one row per year, keyed by
-// country code. [{ year, USA: 1.2, CHN: 3.4, … }, …]. Missing values stay absent
-// (recharts `connectNulls` bridges the gaps). Only `codes` of interest are kept.
-export function mergeSeries(rows, codes) {
-  const wanted = new Set(codes);
-  const byYear = new Map();
+// Series are cached per (indicator, country) PAIR — independent of the country set
+// composition. That is what makes removing a country free: the remaining pairs are
+// already cached, so charts redraw from cache with no network request; and adding a
+// country only fetches that one country's pair, not the whole set.
+export function pairKey(indicatorCode, countryCode) {
+  return `${indicatorCode}|${countryCode}`;
+}
+
+// Normalize the rows for ONE country out of a (possibly multi-country) WB response
+// into a sorted [{ year, value }] list.
+export function normalizeSeriesFor(rows, code) {
+  const out = [];
   for (const r of rows ?? []) {
+    if (r.countryiso3code !== code) continue;
     const year = Number(r.date);
     if (!Number.isFinite(year)) continue;
-    if (!wanted.has(r.countryiso3code)) continue;
-    if (!byYear.has(year)) byYear.set(year, { year });
-    byYear.get(year)[r.countryiso3code] = r.value;
+    out.push({ year, value: r.value });
+  }
+  out.sort((a, b) => a.year - b.year);
+  return out;
+}
+
+// Merge the cached per-country series for the current set into recharts rows:
+// [{ year, USA: 1.2, CHN: 3.4, … }, …]. `cache` maps pairKey → [{ year, value }].
+// Countries with no cached data yet are simply absent (their line appears once it
+// loads); `connectNulls` bridges gaps within a series.
+export function buildRows(countrySet, cache, indicatorCode) {
+  const byYear = new Map();
+  for (const entry of countrySet) {
+    const points = cache[pairKey(indicatorCode, entry.code)];
+    if (!points) continue;
+    for (const { year, value } of points) {
+      if (value == null) continue;
+      if (!byYear.has(year)) byYear.set(year, { year });
+      byYear.get(year)[entry.code] = value;
+    }
   }
   return [...byYear.values()].sort((a, b) => a.year - b.year);
 }
 
-// Most recent non-null point for a country code in merged data.
+// Most recent non-null point for a country code in merged recharts rows.
 export function latestFor(data, code) {
   for (let i = data.length - 1; i >= 0; i--) {
     if (data[i][code] != null) return { year: data[i].year, value: data[i][code] };

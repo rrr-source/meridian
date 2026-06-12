@@ -34,7 +34,10 @@ const messages = {
     "relocate.note":
       "A simplified livability index: monetary values are log-scaled and outliers are trimmed at the 5th/95th percentile, so the ranking reflects broad quality of life rather than a single stretched axis.",
 
-    "placeholder.quiz": "Quiz mode — coming next.",
+    "quiz.prompt": "Which country's GDP per capita is this?",
+    "quiz.axisLabel": "GDP per capita ($)",
+    "quiz.next": "Next question",
+    "quiz.score": "Score",
   },
 };
 

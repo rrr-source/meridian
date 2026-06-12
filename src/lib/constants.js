@@ -36,6 +36,13 @@ export const INDICATOR_LIST = Object.values(INDICATORS);
 // BX.KLT.DINV.WD.GD.ZS  FDI net inflows (% of GDP)
 // SI.POV.GINI         Gini index (sparse coverage)
 
+// Quiz pool — ~36 recognizable countries with good GDP/capita coverage (ISO-3).
+export const QUIZ_POOL = [
+  "USA", "CHN", "IND", "JPN", "DEU", "KOR", "SGP", "ARE", "KAZ", "UZB", "BRA", "NGA",
+  "GBR", "FRA", "ITA", "ESP", "CAN", "AUS", "RUS", "MEX", "IDN", "TUR", "SAU", "ZAF",
+  "EGY", "ARG", "THA", "VNM", "POL", "NLD", "SWE", "NOR", "CHE", "MYS", "PHL", "PAK",
+];
+
 // Chart series colors (mirror the @theme tokens for use inside recharts props).
 export const SERIES_A = "#ea7a1d"; // amber — country A
 export const SERIES_B = "#2563eb"; // blue  — country B

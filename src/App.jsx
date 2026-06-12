@@ -4,6 +4,7 @@ import { t } from "./lib/i18n";
 import { fetchCountries } from "./lib/api";
 import Compare from "./components/Compare";
 import Relocate from "./components/Relocate";
+import Quiz from "./components/Quiz";
 
 const TABS = [
   { id: "compare", labelKey: "tab.compare" },
@@ -68,24 +69,9 @@ export default function App() {
         ) : tab === "relocate" ? (
           <Relocate countries={countries} />
         ) : (
-          <Placeholder tab={tab} countries={countries} />
+          <Quiz countries={countries} />
         )}
       </main>
     </div>
-  );
-}
-
-// Phase-1 placeholder per tab; real modes land in later phases.
-function Placeholder({ tab, countries }) {
-  const keyByTab = {
-    quiz: "placeholder.quiz",
-  };
-  return (
-    <section className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-      <p className="text-slate-600">{t(keyByTab[tab])}</p>
-      <p className="mt-3 num text-sm text-slate-400">
-        {countries.length ? t("countries.loaded", { n: countries.length }) : t("state.loading")}
-      </p>
-    </section>
   );
 }

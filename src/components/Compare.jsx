@@ -5,6 +5,7 @@ import { countryLabel } from "../lib/countries";
 import { fetchSeries } from "../lib/api";
 import { INDICATORS, START_YEAR, END_YEAR, SERIES_A, SERIES_B } from "../lib/constants";
 import { formatValue, formatAxis } from "../lib/format";
+import { useReducedMotion } from "../lib/useReducedMotion";
 
 // The three indicators shown side by side in Compare.
 const SHOWN = ["gdppc", "pop", "internet"];
@@ -150,6 +151,7 @@ function CountryPicker({ label, color, value, onChange, countries }) {
 
 function IndicatorCard({ indicator, data, loading, labelA, labelB }) {
   const { unit } = indicator;
+  const reduced = useReducedMotion();
   const latestA = latest(data, "A");
   const latestB = latest(data, "B");
   const hasData = data.some((d) => d.A != null || d.B != null);
@@ -191,8 +193,8 @@ function IndicatorCard({ indicator, data, loading, labelA, labelB }) {
                 formatter={(value, name) => [formatValue(value, unit), name]}
                 contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
               />
-              <Line type="monotone" dataKey="A" name={labelA} stroke={SERIES_A} strokeWidth={2} dot={false} connectNulls />
-              <Line type="monotone" dataKey="B" name={labelB} stroke={SERIES_B} strokeWidth={2} dot={false} connectNulls />
+              <Line type="monotone" dataKey="A" name={labelA} stroke={SERIES_A} strokeWidth={2} dot={false} connectNulls isAnimationActive={!reduced} />
+              <Line type="monotone" dataKey="B" name={labelB} stroke={SERIES_B} strokeWidth={2} dot={false} connectNulls isAnimationActive={!reduced} />
             </LineChart>
           </ResponsiveContainer>
         )}
@@ -209,11 +211,11 @@ function Readout({ color, name, point, unit }) {
         <span className="truncate text-sm text-slate-500">{name}</span>
       </div>
       <div className="num mt-1 text-2xl font-semibold text-slate-900">{point ? formatValue(point.value, unit) : "—"}</div>
-      {point && <div className="num text-xs text-slate-400">{point.year}</div>}
+      {point && <div className="num text-xs text-slate-500">{point.year}</div>}
     </div>
   );
 }
 
 function Centered({ children }) {
-  return <div className="flex h-full items-center justify-center text-sm text-slate-400">{children}</div>;
+  return <div className="flex h-full items-center justify-center text-sm text-slate-500">{children}</div>;
 }

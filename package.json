@@ -2,7 +2,14 @@
   "name": "meridian",
   "private": true,
   "version": "0.1.0",
+  "description": "An atlas of country development built on World Bank Open Data — compare countries, rank livability, and quiz yourself.",
+  "license": "MIT",
   "type": "module",
+  "homepage": "https://github.com/rrr-source/meridian",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rrr-source/meridian.git"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

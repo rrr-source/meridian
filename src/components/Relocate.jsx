@@ -143,18 +143,18 @@ export default function Relocate({ countries }) {
             {t("state.error")} {error}
           </p>
         ) : ranking === null ? (
-          <p className="mt-4 text-sm text-slate-400">{t("relocate.selectHint")}</p>
+          <p className="mt-4 text-sm text-slate-500">{t("relocate.selectHint")}</p>
         ) : ranking === undefined || loading ? (
-          <p className="mt-4 text-sm text-slate-400">{t("state.loading")}</p>
+          <p className="mt-4 text-sm text-slate-500">{t("state.loading")}</p>
         ) : ranking.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-400">{t("relocate.zeroWeightHint")}</p>
+          <p className="mt-4 text-sm text-slate-500">{t("relocate.zeroWeightHint")}</p>
         ) : (
           <ol className="mt-4 space-y-3">
             {ranking.slice(0, TOP_N).map((row, i) => {
               const country = byId.get(row.code);
               return (
                 <li key={row.code} className="flex items-center gap-3">
-                  <span className="num w-6 shrink-0 text-right text-sm text-slate-400">{i + 1}</span>
+                  <span className="num w-6 shrink-0 text-right text-sm text-slate-500">{i + 1}</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="truncate text-sm text-slate-900">
@@ -172,7 +172,7 @@ export default function Relocate({ countries }) {
           </ol>
         )}
 
-        <p className="mt-5 border-t border-slate-100 pt-4 text-xs text-slate-400">{t("relocate.note")}</p>
+        <p className="mt-5 border-t border-slate-100 pt-4 text-xs text-slate-500">{t("relocate.note")}</p>
       </section>
     </div>
   );

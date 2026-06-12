@@ -6,6 +6,7 @@ import { countryLabel } from "../lib/countries";
 import { fetchSeries } from "../lib/api";
 import { INDICATORS, QUIZ_POOL, START_YEAR, END_YEAR, INK } from "../lib/constants";
 import { formatValue, formatAxis } from "../lib/format";
+import { useReducedMotion } from "../lib/useReducedMotion";
 
 const GDPPC = INDICATORS.gdppc;
 const N_OPTIONS = 4;
@@ -34,6 +35,7 @@ export default function Quiz({ countries }) {
   const [selected, setSelected] = useState(null); // chosen option code
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const reqId = useRef(0);
+  const reduced = useReducedMotion();
 
   const byId = useMemo(() => new Map(countries.map((c) => [c.id, c])), [countries]);
   const nameOf = (code) => {
@@ -119,7 +121,7 @@ export default function Quiz({ countries }) {
                   formatter={(value) => [formatValue(value, GDPPC.unit), t("quiz.axisLabel")]}
                   contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
                 />
-                <Line type="monotone" dataKey="value" stroke={INK} strokeWidth={2} dot={false} connectNulls />
+                <Line type="monotone" dataKey="value" stroke={INK} strokeWidth={2} dot={false} connectNulls isAnimationActive={!reduced} />
               </LineChart>
             </ResponsiveContainer>
           )}
@@ -167,5 +169,5 @@ export default function Quiz({ countries }) {
 }
 
 function Centered({ children }) {
-  return <div className="flex h-full items-center justify-center text-sm text-slate-400">{children}</div>;
+  return <div className="flex h-full items-center justify-center text-sm text-slate-500">{children}</div>;
 }

@@ -18,7 +18,9 @@ const messages = {
 
     "countries.loaded": "{n} countries loaded",
 
-    "placeholder.compare": "Compare mode — coming next.",
+    "compare.countryA": "Country A",
+    "compare.countryB": "Country B",
+
     "placeholder.relocate": "Relocate mode — coming next.",
     "placeholder.quiz": "Quiz mode — coming next.",
   },

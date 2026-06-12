@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Globe } from "lucide-react";
 import { t } from "./lib/i18n";
 import { fetchCountries } from "./lib/api";
+import Compare from "./components/Compare";
 
 const TABS = [
   { id: "compare", labelKey: "tab.compare" },
@@ -61,6 +62,8 @@ export default function App() {
           <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {t("state.error")} {error}
           </p>
+        ) : tab === "compare" ? (
+          <Compare countries={countries} />
         ) : (
           <Placeholder tab={tab} countries={countries} />
         )}
@@ -72,7 +75,6 @@ export default function App() {
 // Phase-1 placeholder per tab; real modes land in later phases.
 function Placeholder({ tab, countries }) {
   const keyByTab = {
-    compare: "placeholder.compare",
     relocate: "placeholder.relocate",
     quiz: "placeholder.quiz",
   };

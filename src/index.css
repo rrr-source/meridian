@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+/* Design tokens become utilities: bg-ink, text-accent, stroke-series-a, etc. */
+@theme {
+  --color-ink: #0f172a;
+  --color-accent: #0d9488;
+  --color-series-a: #ea7a1d;
+  --color-series-b: #2563eb;
+}
+
+/* The signature: every figure is a monospace, tabular-nums "instrument" readout. */
+.num {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

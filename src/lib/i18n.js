@@ -18,8 +18,10 @@ const messages = {
 
     "countries.loaded": "{n} countries loaded",
 
-    "compare.countryA": "Country A",
-    "compare.countryB": "Country B",
+    "compare.countries": "Countries",
+    "compare.addCountry": "Add country",
+    "compare.removeCountry": "Remove {country}",
+    "compare.countryLimit": "Up to {n} countries",
     "compare.indicator": "Indicator",
     "compare.presetGroup": "Preset indicators",
     "compare.customOption": "Searched: {label}",

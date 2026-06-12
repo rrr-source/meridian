@@ -4,36 +4,13 @@ import { Plus, X, Search } from "lucide-react";
 import { t } from "../lib/i18n";
 import { countryLabel } from "../lib/countries";
 import { fetchSeries } from "../lib/api";
-import { INDICATORS, INDICATOR_LIST, DEFAULT_COMPARE, START_YEAR, END_YEAR, SERIES_A, SERIES_B } from "../lib/constants";
+import { INDICATORS, INDICATOR_LIST, DEFAULT_COMPARE, DEFAULT_COUNTRIES, MAX_COUNTRIES, START_YEAR, END_YEAR } from "../lib/constants";
+import { addCountry, removeCountry, initCountrySet, colorForSlot, mergeSeries, latestFor } from "../lib/compareData";
 import { describeIndicator, searchIndicators } from "../lib/indicators";
 import { formatValue, formatAxis } from "../lib/format";
 import { useReducedMotion } from "../lib/useReducedMotion";
 
-const DEFAULT_A = "USA";
-const DEFAULT_B = "CHN";
 const SEARCH_DEBOUNCE_MS = 400;
-
-// Fold WB rows for two countries into recharts data: [{ year, A, B }, ...].
-function mergeSeries(rows, codeA, codeB) {
-  const byYear = new Map();
-  for (const r of rows ?? []) {
-    const year = Number(r.date);
-    if (!Number.isFinite(year)) continue;
-    if (!byYear.has(year)) byYear.set(year, { year });
-    const slot = byYear.get(year);
-    if (r.countryiso3code === codeA) slot.A = r.value;
-    else if (r.countryiso3code === codeB) slot.B = r.value;
-  }
-  return [...byYear.values()].sort((a, b) => a.year - b.year);
-}
-
-// Most recent non-null point for a series key ("A" | "B").
-function latest(data, key) {
-  for (let i = data.length - 1; i >= 0; i--) {
-    if (data[i][key] != null) return { year: data[i].year, value: data[i][key] };
-  }
-  return null;
-}
 
 // Stable per-chart id, independent of the chosen indicator (so React keys survive
 // indicator swaps and we can have a chart with no selection mid-edit).
@@ -41,16 +18,16 @@ let nextChartId = 0;
 const makeChart = (indicator) => ({ id: ++nextChartId, indicator });
 
 export default function Compare({ countries }) {
-  const [codeA, setCodeA] = useState(DEFAULT_A);
-  const [codeB, setCodeB] = useState(DEFAULT_B);
+  // Shared country set — { code, slot }[] — applies to every chart. Slots give each
+  // country a stable palette color across charts and chips (see compareData.js).
+  const [countrySet, setCountrySet] = useState(() => initCountrySet(DEFAULT_COUNTRIES));
   const [charts, setCharts] = useState(() => DEFAULT_COMPARE.map((key) => makeChart(describeIndicator(INDICATORS[key].code))));
 
-  // Series cache keyed by `${codeA}|${codeB}|${indicatorCode}` — survives chart
-  // add/remove/reorder, and changing a country naturally invalidates every key.
+  // Series cache keyed by `${countriesKey}|${indicatorCode}`. Changing the country
+  // set changes the key, so charts refetch with the new set; old keys stay cached.
   const [seriesByKey, setSeriesByKey] = useState({});
   const [error, setError] = useState(null);
 
-  // id → country, for labels in dropdowns, readouts and chart lines.
   const byId = useMemo(() => {
     const m = new Map();
     for (const c of countries) m.set(c.id, c);
@@ -62,26 +39,30 @@ export default function Compare({ countries }) {
     return c ? countryLabel(c) : code;
   };
 
-  const keyFor = (code) => `${codeA}|${codeB}|${code}`;
-  const activeCodes = useMemo(() => charts.map((c) => c.indicator.code), [charts]);
+  const codes = useMemo(() => countrySet.map((e) => e.code), [countrySet]);
+  const countriesKey = useMemo(() => [...codes].sort().join(";"), [codes]);
+  const keyFor = (indicatorCode) => `${countriesKey}|${indicatorCode}`;
 
-  // Fetch any active indicator not yet cached for the current country pair.
+  const activeIndicatorCodes = useMemo(() => charts.map((c) => c.indicator.code), [charts]);
+
+  // Fetch any active indicator not yet cached for the current country set. One
+  // request per indicator returns all selected countries at once.
   useEffect(() => {
-    const missing = [...new Set(activeCodes)].filter((code) => !(keyFor(code) in seriesByKey));
+    const missing = [...new Set(activeIndicatorCodes)].filter((ic) => !(keyFor(ic) in seriesByKey));
     if (missing.length === 0) return;
 
     let alive = true;
     setError(null);
     Promise.all(
-      missing.map((code) =>
-        fetchSeries([codeA, codeB], code, START_YEAR, END_YEAR).then((rows) => [code, mergeSeries(rows, codeA, codeB)])
+      missing.map((ic) =>
+        fetchSeries(codes, ic, START_YEAR, END_YEAR).then((rows) => [ic, mergeSeries(rows, codes)])
       )
     )
       .then((results) => {
         if (!alive) return;
         setSeriesByKey((prev) => {
           const next = { ...prev };
-          for (const [code, data] of results) next[`${codeA}|${codeB}|${code}`] = data;
+          for (const [ic, data] of results) next[`${countriesKey}|${ic}`] = data;
           return next;
         });
       })
@@ -92,33 +73,36 @@ export default function Compare({ countries }) {
     return () => {
       alive = false;
     };
-  }, [activeCodes, seriesByKey, codeA, codeB]);
+  }, [activeIndicatorCodes, seriesByKey, countriesKey, codes]);
 
-  // Codes already charted — used to disable duplicate picks across charts.
-  const pickedCodes = useMemo(() => new Set(activeCodes), [activeCodes]);
+  // --- Country set actions ---
+  const selectedCodes = useMemo(() => new Set(codes), [codes]);
+  const canAddCountry = countrySet.length < MAX_COUNTRIES;
+  const onAddCountry = (code) => setCountrySet((set) => addCountry(set, code));
+  const onRemoveCountry = (code) => setCountrySet((set) => removeCountry(set, code));
 
-  const setIndicator = (id, indicator) =>
-    setCharts((prev) => prev.map((c) => (c.id === id ? { ...c, indicator } : c)));
-
+  // --- Chart actions (unchanged behavior: pick / search / add / remove + dedupe) ---
+  const pickedIndicators = useMemo(() => new Set(activeIndicatorCodes), [activeIndicatorCodes]);
+  const setIndicator = (id, indicator) => setCharts((prev) => prev.map((c) => (c.id === id ? { ...c, indicator } : c)));
   const removeChart = (id) => setCharts((prev) => prev.filter((c) => c.id !== id));
-
-  // Add a chart defaulting to the first preset not already shown.
   const addChart = () => {
-    const free = INDICATOR_LIST.find((i) => !pickedCodes.has(i.code));
+    const free = INDICATOR_LIST.find((i) => !pickedIndicators.has(i.code));
     if (!free) return;
     setCharts((prev) => [...prev, makeChart(describeIndicator(free.code))]);
   };
-
-  const canAdd = INDICATOR_LIST.some((i) => !pickedCodes.has(i.code));
-  const labelA = labelFor(codeA);
-  const labelB = labelFor(codeB);
+  const canAddChart = INDICATOR_LIST.some((i) => !pickedIndicators.has(i.code));
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row">
-        <CountryPicker label={t("compare.countryA")} color={SERIES_A} value={codeA} onChange={setCodeA} countries={countries} />
-        <CountryPicker label={t("compare.countryB")} color={SERIES_B} value={codeB} onChange={setCodeB} countries={countries} />
-      </div>
+      <CountryBar
+        countrySet={countrySet}
+        countries={countries}
+        selectedCodes={selectedCodes}
+        canAdd={canAddCountry}
+        labelFor={labelFor}
+        onAdd={onAddCountry}
+        onRemove={countrySet.length > 1 ? onRemoveCountry : null}
+      />
 
       {error ? (
         <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -131,11 +115,11 @@ export default function Compare({ countries }) {
               key={chart.id}
               indicator={chart.indicator}
               data={seriesByKey[keyFor(chart.indicator.code)]}
-              pickedCodes={pickedCodes}
+              countrySet={countrySet}
+              labelFor={labelFor}
+              pickedCodes={pickedIndicators}
               onChange={(indicator) => setIndicator(chart.id, indicator)}
               onRemove={charts.length > 1 ? () => removeChart(chart.id) : null}
-              labelA={labelA}
-              labelB={labelB}
             />
           ))}
         </div>
@@ -144,7 +128,7 @@ export default function Compare({ countries }) {
       <button
         type="button"
         onClick={addChart}
-        disabled={!canAdd}
+        disabled={!canAddChart}
         className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-600 transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <Plus size={16} aria-hidden="true" />
@@ -154,38 +138,79 @@ export default function Compare({ countries }) {
   );
 }
 
-function CountryPicker({ label, color, value, onChange, countries }) {
+// Shared country selector: a row of colored chips (name + remove ×) plus an
+// "Add country" dropdown. Min 1, max 5, deduped.
+function CountryBar({ countrySet, countries, selectedCodes, canAdd, labelFor, onAdd, onRemove }) {
+  const available = useMemo(
+    () => countries.filter((c) => !selectedCodes.has(c.id)),
+    [countries, selectedCodes]
+  );
+
   return (
-    <label className="flex flex-1 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
-      <span className="text-sm font-medium text-slate-500">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="ml-auto min-w-0 flex-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-      >
-        {countries.length === 0 ? (
-          <option value={value}>{t("state.loading")}</option>
-        ) : (
-          countries.map((c) => (
-            <option key={c.id} value={c.id}>
-              {countryLabel(c)}
-            </option>
-          ))
+    <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-slate-500">{t("compare.countries")}</span>
+
+        {countrySet.map((entry) => {
+          const color = colorForSlot(entry.slot);
+          const name = labelFor(entry.code);
+          return (
+            <span
+              key={entry.code}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 py-1 pl-2.5 pr-1.5 text-sm"
+            >
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
+              <span className="text-slate-900">{name}</span>
+              {onRemove && (
+                <button
+                  type="button"
+                  onClick={() => onRemove(entry.code)}
+                  aria-label={t("compare.removeCountry", { country: name })}
+                  title={t("compare.removeCountry", { country: name })}
+                  className="rounded-full p-0.5 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+              )}
+            </span>
+          );
+        })}
+
+        {canAdd && countries.length > 0 && (
+          <label className="inline-flex items-center">
+            <span className="sr-only">{t("compare.addCountry")}</span>
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) onAdd(e.target.value);
+              }}
+              aria-label={t("compare.addCountry")}
+              className="rounded-full border border-dashed border-slate-300 bg-white py-1.5 pl-3 pr-2 text-sm font-medium text-slate-600 hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <option value="">+ {t("compare.addCountry")}</option>
+              {available.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {countryLabel(c)}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
-      </select>
-    </label>
+
+        {!canAdd && (
+          <span className="text-xs text-slate-400">{t("compare.countryLimit", { n: MAX_COUNTRIES })}</span>
+        )}
+      </div>
+    </section>
   );
 }
 
-function IndicatorCard({ indicator, data, pickedCodes, onChange, onRemove, labelA, labelB }) {
+function IndicatorCard({ indicator, data, countrySet, labelFor, pickedCodes, onChange, onRemove }) {
   const { unit, label } = indicator;
   const reduced = useReducedMotion();
   const loading = data === undefined;
   const rows = data ?? [];
-  const latestA = latest(rows, "A");
-  const latestB = latest(rows, "B");
-  const hasData = rows.some((d) => d.A != null || d.B != null);
+  const hasData = rows.some((d) => countrySet.some((e) => d[e.code] != null));
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -206,9 +231,17 @@ function IndicatorCard({ indicator, data, pickedCodes, onChange, onRemove, label
         )}
       </div>
 
-      <div className="mt-4 flex gap-8">
-        <Readout color={SERIES_A} name={labelA} point={latestA} unit={unit} />
-        <Readout color={SERIES_B} name={labelB} point={latestB} unit={unit} />
+      {/* Per-country latest-value readouts — double as the legend; wrap on mobile. */}
+      <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3">
+        {countrySet.map((entry) => (
+          <Readout
+            key={entry.code}
+            color={colorForSlot(entry.slot)}
+            name={labelFor(entry.code)}
+            point={latestFor(rows, entry.code)}
+            unit={unit}
+          />
+        ))}
       </div>
 
       <div className="mt-5 h-60">
@@ -239,8 +272,19 @@ function IndicatorCard({ indicator, data, pickedCodes, onChange, onRemove, label
                 formatter={(value, name) => [formatValue(value, unit), name]}
                 contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
               />
-              <Line type="monotone" dataKey="A" name={labelA} stroke={SERIES_A} strokeWidth={2} dot={false} connectNulls isAnimationActive={!reduced} />
-              <Line type="monotone" dataKey="B" name={labelB} stroke={SERIES_B} strokeWidth={2} dot={false} connectNulls isAnimationActive={!reduced} />
+              {countrySet.map((entry) => (
+                <Line
+                  key={entry.code}
+                  type="monotone"
+                  dataKey={entry.code}
+                  name={labelFor(entry.code)}
+                  stroke={colorForSlot(entry.slot)}
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls
+                  isAnimationActive={!reduced}
+                />
+              ))}
             </LineChart>
           </ResponsiveContainer>
         )}
@@ -395,7 +439,7 @@ function Readout({ color, name, point, unit }) {
         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
         <span className="truncate text-sm text-slate-500">{name}</span>
       </div>
-      <div className="num mt-1 text-2xl font-semibold text-slate-900">{point ? formatValue(point.value, unit) : "—"}</div>
+      <div className="num mt-0.5 text-xl font-semibold text-slate-900">{point ? formatValue(point.value, unit) : "—"}</div>
       {point && <div className="num text-xs text-slate-500">{point.year}</div>}
     </div>
   );

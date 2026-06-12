@@ -64,8 +64,21 @@ export const QUIZ_POOL = [
   "EGY", "ARG", "THA", "VNM", "POL", "NLD", "SWE", "NOR", "CHE", "MYS", "PHL", "PAK",
 ];
 
-// Chart series colors (mirror the @theme tokens for use inside recharts props).
-export const SERIES_A = "#ea7a1d"; // amber — country A
-export const SERIES_B = "#2563eb"; // blue  — country B
+// Chart series palette — 5 visually distinct, accessible hues (mirror the @theme
+// `--color-series-*` tokens for use inside recharts props). Compare assigns one to
+// each selected country by a stable slot, so the same country keeps its color
+// across every chart and chip. Amber + blue stay first (the original A/B colors).
+export const SERIES_PALETTE = [
+  "#ea7a1d", // amber
+  "#2563eb", // blue
+  "#16a34a", // green
+  "#7c3aed", // violet
+  "#db2777", // pink
+];
+
+// Compare country set: shared across all charts, 1–5 countries.
+export const MAX_COUNTRIES = SERIES_PALETTE.length;
+export const DEFAULT_COUNTRIES = ["USA", "CHN"];
+
 export const INK = "#0f172a";
 export const ACCENT = "#0d9488";

@@ -3,6 +3,7 @@ import { Globe } from "lucide-react";
 import { t } from "./lib/i18n";
 import { fetchCountries } from "./lib/api";
 import Compare from "./components/Compare";
+import Relocate from "./components/Relocate";
 
 const TABS = [
   { id: "compare", labelKey: "tab.compare" },
@@ -64,6 +65,8 @@ export default function App() {
           </p>
         ) : tab === "compare" ? (
           <Compare countries={countries} />
+        ) : tab === "relocate" ? (
+          <Relocate countries={countries} />
         ) : (
           <Placeholder tab={tab} countries={countries} />
         )}
@@ -75,7 +78,6 @@ export default function App() {
 // Phase-1 placeholder per tab; real modes land in later phases.
 function Placeholder({ tab, countries }) {
   const keyByTab = {
-    relocate: "placeholder.relocate",
     quiz: "placeholder.quiz",
   };
   return (

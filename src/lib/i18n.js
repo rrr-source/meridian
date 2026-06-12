@@ -21,7 +21,19 @@ const messages = {
     "compare.countryA": "Country A",
     "compare.countryB": "Country B",
 
-    "placeholder.relocate": "Relocate mode — coming next.",
+    "relocate.criteria": "Criteria",
+    "relocate.weight": "weight",
+    "relocate.ranking": "Best matches",
+    "relocate.crit.income": "Income",
+    "relocate.crit.healthcare": "Healthcare",
+    "relocate.crit.urbanization": "Urbanization",
+    "relocate.crit.internet": "Internet",
+    "relocate.crit.longevity": "Longevity",
+    "relocate.selectHint": "Select at least one criterion to build a ranking.",
+    "relocate.zeroWeightHint": "Give at least one criterion a weight above zero.",
+    "relocate.note":
+      "A simplified livability index: monetary values are log-scaled and outliers are trimmed at the 5th/95th percentile, so the ranking reflects broad quality of life rather than a single stretched axis.",
+
     "placeholder.quiz": "Quiz mode — coming next.",
   },
 };

@@ -6,6 +6,9 @@
   --color-accent: #0d9488;
   --color-series-a: #ea7a1d;
   --color-series-b: #2563eb;
+  --color-series-c: #16a34a;
+  --color-series-d: #7c3aed;
+  --color-series-e: #db2777;
 }
 
 /* The signature: every figure is a monospace, tabular-nums "instrument" readout. */

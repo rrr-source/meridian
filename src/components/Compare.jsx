@@ -5,7 +5,7 @@ import { t } from "../lib/i18n";
 import { countryLabel } from "../lib/countries";
 import { fetchSeries } from "../lib/api";
 import { INDICATORS, INDICATOR_LIST, DEFAULT_COMPARE, DEFAULT_COUNTRIES, MAX_COUNTRIES, START_YEAR, END_YEAR } from "../lib/constants";
-import { addCountry, removeCountry, initCountrySet, colorForSlot, mergeSeries, latestFor } from "../lib/compareData";
+import { addCountry, removeCountry, initCountrySet, colorForSlot, pairKey, normalizeSeriesFor, buildRows, latestFor } from "../lib/compareData";
 import { describeIndicator, searchIndicators } from "../lib/indicators";
 import { formatValue, formatAxis } from "../lib/format";
 import { useReducedMotion } from "../lib/useReducedMotion";
@@ -23,10 +23,11 @@ export default function Compare({ countries }) {
   const [countrySet, setCountrySet] = useState(() => initCountrySet(DEFAULT_COUNTRIES));
   const [charts, setCharts] = useState(() => DEFAULT_COMPARE.map((key) => makeChart(describeIndicator(INDICATORS[key].code))));
 
-  // Series cache keyed by `${countriesKey}|${indicatorCode}`. Changing the country
-  // set changes the key, so charts refetch with the new set; old keys stay cached.
-  const [seriesByKey, setSeriesByKey] = useState({});
-  const [error, setError] = useState(null);
+  // Series cache, keyed per (indicator, country) PAIR — see compareData.js. Keeping
+  // it per-pair (not per whole-set) means removing a country needs no fetch at all,
+  // and adding one fetches only the new country.
+  const [cache, setCache] = useState({}); // pairKey -> [{ year, value }]
+  const [failed, setFailed] = useState({}); // pairKey -> true (errored; render partial)
 
   const byId = useMemo(() => {
     const m = new Map();
@@ -40,40 +41,100 @@ export default function Compare({ countries }) {
   };
 
   const codes = useMemo(() => countrySet.map((e) => e.code), [countrySet]);
-  const countriesKey = useMemo(() => [...codes].sort().join(";"), [codes]);
-  const keyFor = (indicatorCode) => `${countriesKey}|${indicatorCode}`;
-
   const activeIndicatorCodes = useMemo(() => charts.map((c) => c.indicator.code), [charts]);
 
-  // Fetch any active indicator not yet cached for the current country set. One
-  // request per indicator returns all selected countries at once.
+  // Every (indicator, country) pair currently on screen.
+  const neededPairs = useMemo(() => {
+    const seen = new Set();
+    const pairs = [];
+    for (const ic of new Set(activeIndicatorCodes)) {
+      for (const e of countrySet) {
+        const key = pairKey(ic, e.code);
+        if (!seen.has(key)) {
+          seen.add(key);
+          pairs.push({ key, indicatorCode: ic, country: e.code });
+        }
+      }
+    }
+    return pairs;
+  }, [activeIndicatorCodes, countrySet]);
+
+  // Drop "failed" marks for pairs no longer on screen, so a removed-then-re-added
+  // country (or indicator) gets a fresh attempt instead of staying stuck failed.
   useEffect(() => {
-    const missing = [...new Set(activeIndicatorCodes)].filter((ic) => !(keyFor(ic) in seriesByKey));
+    const need = new Set(neededPairs.map((p) => p.key));
+    setFailed((prev) => {
+      let changed = false;
+      const next = {};
+      for (const k of Object.keys(prev)) {
+        if (need.has(k)) next[k] = prev[k];
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [neededPairs]);
+
+  // Fetch only the pairs we don't already have (and haven't failed). Removing a
+  // country leaves `missing` empty → no request. Adding one fetches just that pair.
+  //
+  // Race safety: each run owns an AbortController; the cleanup aborts it, so a
+  // request from a superseded run can never write stale data. Results are recorded
+  // with `allSettled`, so one failed indicator can't reject the others, and EVERY
+  // requested pair ends up either cached or marked failed — loading is derived from
+  // that state, so it can never get stuck "true".
+  useEffect(() => {
+    const missing = neededPairs.filter((p) => !(p.key in cache) && !(p.key in failed));
     if (missing.length === 0) return;
 
-    let alive = true;
-    setError(null);
-    Promise.all(
-      missing.map((ic) =>
-        fetchSeries(codes, ic, START_YEAR, END_YEAR).then((rows) => [ic, mergeSeries(rows, codes)])
-      )
-    )
-      .then((results) => {
-        if (!alive) return;
-        setSeriesByKey((prev) => {
-          const next = { ...prev };
-          for (const [ic, data] of results) next[`${countriesKey}|${ic}`] = data;
-          return next;
-        });
-      })
-      .catch((e) => {
-        if (alive) setError(e.message);
+    // Batch missing countries by indicator into one multi-country request each
+    // (country/A;B;C/indicator/…) instead of a request-per-country in a tight loop.
+    const byIndicator = new Map();
+    for (const p of missing) {
+      if (!byIndicator.has(p.indicatorCode)) byIndicator.set(p.indicatorCode, []);
+      byIndicator.get(p.indicatorCode).push(p.country);
+    }
+    const groups = [...byIndicator];
+    const controller = new AbortController();
+
+    (async () => {
+      const settled = await Promise.allSettled(
+        groups.map(([ic, group]) => fetchSeries(group, ic, START_YEAR, END_YEAR, controller.signal))
+      );
+      if (controller.signal.aborted) return; // superseded run — ignore entirely
+
+      const ok = {};
+      const bad = {};
+      groups.forEach(([ic, group], i) => {
+        const res = settled[i];
+        if (res.status === "fulfilled") {
+          for (const country of group) ok[pairKey(ic, country)] = normalizeSeriesFor(res.value, country);
+        } else if (res.reason?.name !== "AbortError") {
+          for (const country of group) bad[pairKey(ic, country)] = true;
+        }
       });
 
-    return () => {
-      alive = false;
+      if (Object.keys(ok).length) setCache((prev) => ({ ...prev, ...ok }));
+      if (Object.keys(bad).length) setFailed((prev) => ({ ...prev, ...bad }));
+    })();
+
+    return () => controller.abort();
+  }, [neededPairs, cache, failed]);
+
+  // Per-chart view state, derived purely from cache/failed — never a stuck flag.
+  const hasValues = (points) => points != null && points.some((p) => p.value != null);
+  const chartState = (indicatorCode) => {
+    const haveAny = countrySet.some((e) => hasValues(cache[pairKey(indicatorCode, e.code)]));
+    const pending = countrySet.some((e) => {
+      const k = pairKey(indicatorCode, e.code);
+      return !(k in cache) && !(k in failed);
+    });
+    const anyFailed = countrySet.some((e) => failed[pairKey(indicatorCode, e.code)]);
+    return {
+      rows: buildRows(countrySet, cache, indicatorCode),
+      loading: pending && !haveAny, // only block when there is nothing to show yet
+      errored: !haveAny && !pending && anyFailed,
     };
-  }, [activeIndicatorCodes, seriesByKey, countriesKey, codes]);
+  };
 
   // --- Country set actions ---
   const selectedCodes = useMemo(() => new Set(codes), [codes]);
@@ -104,26 +165,25 @@ export default function Compare({ countries }) {
         onRemove={countrySet.length > 1 ? onRemoveCountry : null}
       />
 
-      {error ? (
-        <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {t("state.error")} {error}
-        </p>
-      ) : (
-        <div className="grid gap-6">
-          {charts.map((chart) => (
+      <div className="grid gap-6">
+        {charts.map((chart) => {
+          const { rows, loading, errored } = chartState(chart.indicator.code);
+          return (
             <IndicatorCard
               key={chart.id}
               indicator={chart.indicator}
-              data={seriesByKey[keyFor(chart.indicator.code)]}
+              data={rows}
+              loading={loading}
+              errored={errored}
               countrySet={countrySet}
               labelFor={labelFor}
               pickedCodes={pickedIndicators}
               onChange={(indicator) => setIndicator(chart.id, indicator)}
               onRemove={charts.length > 1 ? () => removeChart(chart.id) : null}
             />
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
 
       <button
         type="button"
@@ -205,10 +265,9 @@ function CountryBar({ countrySet, countries, selectedCodes, canAdd, labelFor, on
   );
 }
 
-function IndicatorCard({ indicator, data, countrySet, labelFor, pickedCodes, onChange, onRemove }) {
+function IndicatorCard({ indicator, data, loading, errored, countrySet, labelFor, pickedCodes, onChange, onRemove }) {
   const { unit, label } = indicator;
   const reduced = useReducedMotion();
-  const loading = data === undefined;
   const rows = data ?? [];
   const hasData = rows.some((d) => countrySet.some((e) => d[e.code] != null));
 
@@ -247,6 +306,8 @@ function IndicatorCard({ indicator, data, countrySet, labelFor, pickedCodes, onC
       <div className="mt-5 h-60">
         {loading ? (
           <Centered>{t("state.loading")}</Centered>
+        ) : errored ? (
+          <Centered>{t("state.error")}</Centered>
         ) : !hasData ? (
           <Centered>{t("state.empty")}</Centered>
         ) : (

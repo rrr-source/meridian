@@ -20,6 +20,16 @@ const messages = {
 
     "compare.countryA": "Country A",
     "compare.countryB": "Country B",
+    "compare.indicator": "Indicator",
+    "compare.presetGroup": "Preset indicators",
+    "compare.customOption": "Searched: {label}",
+    "compare.searchPlaceholder": "Search the World Bank catalog…",
+    "compare.searchLabel": "Search indicators",
+    "compare.searching": "Searching…",
+    "compare.noResults": "No matching indicators.",
+    "compare.addChart": "Add chart",
+    "compare.removeChart": "Remove this chart",
+    "compare.picked": "Already charted",
 
     "relocate.criteria": "Criteria",
     "relocate.weight": "weight",

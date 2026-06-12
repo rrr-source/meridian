@@ -41,3 +41,15 @@ export async function fetchSeries(codes, indicatorCode, start = "", end = "") {
 export async function fetchLatestAll(indicatorCode) {
   return wbFetch(`/country/all/indicator/${indicatorCode}?format=json&mrnev=1&per_page=400`);
 }
+
+// The World Bank API has no reliable server-side keyword search for indicators
+// (the documented `?search=` param is silently ignored on /v2/indicator). So for
+// the Compare search box we fetch the curated WDI catalog (source=2, ~1,500 clean
+// indicators with labels) once and filter it client-side — see src/lib/indicators.js.
+// Returns [{ code, label }]; the WB `unit` field is always empty here.
+export async function fetchIndicatorCatalog() {
+  const rows = await wbFetch("/indicator?format=json&source=2&per_page=1500");
+  return rows
+    .filter((r) => r.id && r.name)
+    .map((r) => ({ code: r.id, label: r.name }));
+}

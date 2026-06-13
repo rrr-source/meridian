@@ -1,0 +1,291 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ComposableMap, Geographies, Geography } from "react-simple-maps";
+import { Search } from "lucide-react";
+import { t } from "../lib/i18n";
+import { countryLabel } from "../lib/countries";
+import { fetchLatestAll } from "../lib/api";
+import { INDICATORS, INDICATOR_LIST } from "../lib/constants";
+import { describeIndicator, searchIndicators } from "../lib/indicators";
+import { formatValue } from "../lib/format";
+import { GEO_URL, GEO_ISO3_SET, NO_DATA_COLOR, RAMP_FROM, RAMP_TO, iso3ForGeo, buildValueMap, makeColorScale } from "../lib/worldMap";
+
+const SEARCH_DEBOUNCE_MS = 400;
+const DEFAULT_INDICATOR = describeIndicator(INDICATORS.gdppc.code); // GDP per capita
+
+export default function WorldMap({ countries }) {
+  // Chosen indicator survives tab switches (this panel stays mounted — see App.jsx).
+  const [indicator, setIndicator] = useState(DEFAULT_INDICATOR);
+  const [cache, setCache] = useState({}); // indicator code -> mrnev rows
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [tip, setTip] = useState(null); // { name, value, year, x, y }
+  const wrapRef = useRef(null);
+
+  const byId = useMemo(() => new Map(countries.map((c) => [c.id, c])), [countries]);
+  const validCodes = useMemo(() => new Set(countries.map((c) => c.id)), [countries]);
+
+  // Fetch latest-per-country (mrnev=1) for the chosen indicator, once per indicator.
+  useEffect(() => {
+    if (cache[indicator.code]) return;
+    let alive = true;
+    setLoading(true);
+    setError(null);
+    fetchLatestAll(indicator.code)
+      .then((rows) => {
+        if (!alive) return;
+        setCache((prev) => ({ ...prev, [indicator.code]: rows }));
+        setLoading(false);
+      })
+      .catch((e) => {
+        if (!alive) return;
+        setError(e.message);
+        setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [indicator.code]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const rows = cache[indicator.code];
+  const valueMap = useMemo(() => (rows ? buildValueMap(rows, validCodes) : new Map()), [rows, validCodes]);
+  const scale = useMemo(() => makeColorScale(valueMap, indicator.monetary), [valueMap, indicator.monetary]);
+
+  // Coverage: countries with data that actually land on a drawn polygon.
+  const coverage = useMemo(() => {
+    let matched = 0;
+    for (const code of valueMap.keys()) if (GEO_ISO3_SET.has(code)) matched++;
+    return { matched, total: valueMap.size };
+  }, [valueMap]);
+
+  const ready = rows != null && !loading;
+
+  const showTip = (geo, e) => {
+    const code = iso3ForGeo(geo);
+    const datum = code ? valueMap.get(code) : null;
+    const name = (code && byId.get(code) && countryLabel(byId.get(code))) || geo.properties?.name || code || "—";
+    const rect = wrapRef.current?.getBoundingClientRect();
+    setTip({
+      name,
+      value: datum ? formatValue(datum.value, indicator.unit) : t("map.noData"),
+      year: datum?.year ?? null,
+      x: rect ? e.clientX - rect.left : 0,
+      y: rect ? e.clientY - rect.top : 0,
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Indicator picker */}
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <IndicatorPicker value={indicator} onChange={setIndicator} />
+      </section>
+
+      {/* Map */}
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        {error ? (
+          <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {t("state.error")} {error}
+          </p>
+        ) : (
+          <>
+            {/* Legend */}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+              <Legend min={scale.min} max={scale.max} unit={indicator.unit} ready={ready} />
+              <span className="inline-flex items-center gap-2 text-xs text-slate-500">
+                <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: NO_DATA_COLOR }} aria-hidden="true" />
+                {t("map.noData")}
+              </span>
+            </div>
+
+            <div ref={wrapRef} className="relative mt-4">
+              {loading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 text-sm text-slate-500">
+                  {t("state.loading")}
+                </div>
+              )}
+              <ComposableMap
+                projection="geoEqualEarth"
+                projectionConfig={{ scale: 150 }}
+                width={800}
+                height={395}
+                style={{ width: "100%", height: "auto" }}
+                aria-label={indicator.label}
+              >
+                <Geographies geography={GEO_URL}>
+                  {({ geographies }) =>
+                    geographies.map((geo) => {
+                      const code = iso3ForGeo(geo);
+                      const datum = code ? valueMap.get(code) : null;
+                      const fill = datum ? scale.colorFor(datum.value) : NO_DATA_COLOR;
+                      return (
+                        <Geography
+                          key={geo.rsmKey}
+                          geography={geo}
+                          fill={fill}
+                          stroke="#fff"
+                          strokeWidth={0.4}
+                          onMouseEnter={(e) => showTip(geo, e)}
+                          onMouseMove={(e) => showTip(geo, e)}
+                          onMouseLeave={() => setTip(null)}
+                          style={{
+                            default: { outline: "none" },
+                            hover: { outline: "none", fillOpacity: 0.82, cursor: "pointer" },
+                            pressed: { outline: "none" },
+                          }}
+                        />
+                      );
+                    })
+                  }
+                </Geographies>
+              </ComposableMap>
+
+              {tip && (
+                <div
+                  className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs shadow-md"
+                  style={{ left: tip.x, top: tip.y - 8 }}
+                >
+                  <div className="font-medium text-slate-900">{tip.name}</div>
+                  <div className="num text-slate-600">
+                    {tip.value}
+                    {tip.year != null && <span className="ml-1.5 text-slate-400">{tip.year}</span>}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {ready && (
+              <p className="mt-3 text-xs text-slate-500">
+                {t("map.coverage", { matched: coverage.matched, total: coverage.total })}
+              </p>
+            )}
+          </>
+        )}
+
+        <p className="mt-4 border-t border-slate-100 pt-4 text-xs text-slate-500">{t("map.note")}</p>
+      </section>
+    </div>
+  );
+}
+
+// Horizontal ramp legend with min/max readouts (formatted in the indicator's unit).
+function Legend({ min, max, unit, ready }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="num text-xs text-slate-500">{ready && min != null ? formatValue(min, unit) : t("map.legendLow")}</span>
+      <span
+        className="h-3 w-32 rounded-sm border border-slate-200"
+        style={{ background: `linear-gradient(to right, ${RAMP_FROM}, ${RAMP_TO})` }}
+        aria-hidden="true"
+      />
+      <span className="num text-xs text-slate-500">{ready && max != null ? formatValue(max, unit) : t("map.legendHigh")}</span>
+    </div>
+  );
+}
+
+// Preset dropdown + debounced WDI catalog search — reuses the Compare indicators
+// module (describeIndicator / searchIndicators) so the two share one catalog/cache.
+function IndicatorPicker({ value, onChange }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef(null);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    let alive = true;
+    const handle = setTimeout(() => {
+      searchIndicators(q)
+        .then((rows) => alive && (setResults(rows), setSearching(false)))
+        .catch(() => alive && (setResults([]), setSearching(false)));
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      alive = false;
+      clearTimeout(handle);
+    };
+  }, [query]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => boxRef.current && !boxRef.current.contains(e.target) && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const choose = (indicator) => {
+    onChange(indicator);
+    setQuery("");
+    setResults([]);
+    setOpen(false);
+  };
+
+  const selectValue = value.preset ? value.code : "__custom";
+
+  return (
+    <div ref={boxRef} className="relative">
+      <span className="text-sm font-medium text-slate-500">{t("map.indicator")}</span>
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+        <select
+          aria-label={t("map.indicator")}
+          value={selectValue}
+          onChange={(e) => choose(describeIndicator(e.target.value))}
+          className="min-w-0 flex-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-sm font-medium text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          <optgroup label={t("map.presetGroup")}>
+            {INDICATOR_LIST.map((i) => (
+              <option key={i.code} value={i.code}>
+                {i.label}
+              </option>
+            ))}
+          </optgroup>
+          {!value.preset && <option value="__custom">{t("map.customOption", { label: value.label })}</option>}
+        </select>
+
+        <div className="relative sm:w-56">
+          <Search size={15} aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            placeholder={t("map.searchPlaceholder")}
+            aria-label={t("map.searchLabel")}
+            className="w-full rounded-md border border-slate-200 bg-white py-2 pl-8 pr-2 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          />
+        </div>
+      </div>
+
+      {open && query.trim() && (
+        <ul className="absolute right-0 z-30 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg sm:w-72">
+          {searching ? (
+            <li className="px-3 py-2 text-slate-500">{t("map.searching")}</li>
+          ) : results.length === 0 ? (
+            <li className="px-3 py-2 text-slate-500">{t("map.noResults")}</li>
+          ) : (
+            results.map((r) => (
+              <li key={r.code}>
+                <button
+                  type="button"
+                  onClick={() => choose(r)}
+                  className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none"
+                >
+                  <span className="text-slate-900">{r.label}</span>
+                  <span className="num text-xs text-slate-400">{r.code}</span>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}

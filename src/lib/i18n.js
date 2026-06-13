@@ -82,6 +82,8 @@ const messages = {
     "map.legendLow": "Low",
     "map.legendHigh": "High",
     "map.coverage": "{matched} of {total} countries have data for this indicator.",
+    "map.highest": "Highest",
+    "map.lowest": "Lowest",
     "map.note":
       "Latest available value per country (World Bank, most recent non-empty year). Microstates and a few territories are absent from this low-resolution basemap and show as no data.",
   },

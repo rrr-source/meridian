@@ -7,6 +7,7 @@ import { countryLabel } from "../lib/countries";
 import { fetchLatestAll } from "../lib/api";
 import { INDICATORS, INDICATOR_LIST } from "../lib/constants";
 import { describeIndicator, searchIndicators } from "../lib/indicators";
+import { decodeMap, encodeMap, writeUrl } from "../lib/urlState";
 import { formatValue } from "../lib/format";
 import { GEO_URL, GEO_ISO3_SET, NO_DATA_COLOR, RAMP_FROM, RAMP_TO, iso3ForGeo, buildValueMap, makeColorScale } from "../lib/worldMap";
 
@@ -21,9 +22,12 @@ const MAP_W = 800;
 const MAP_H = 587;
 const projection = geoMiller().fitSize([MAP_W, MAP_H], { type: "Sphere" });
 
-export default function WorldMap({ countries }) {
-  // Chosen indicator survives tab switches (this panel stays mounted — see App.jsx).
-  const [indicator, setIndicator] = useState(DEFAULT_INDICATOR);
+export default function WorldMap({ countries, active = false, initialParams = null }) {
+  // Chosen indicator survives tab switches (this panel stays mounted — see App.jsx),
+  // and is restored from the URL when the World map was the active tab on load.
+  const [indicator, setIndicator] = useState(() =>
+    initialParams ? describeIndicator(decodeMap(initialParams).code) : DEFAULT_INDICATOR
+  );
   const [cache, setCache] = useState({}); // indicator code -> mrnev rows
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -54,6 +58,11 @@ export default function WorldMap({ countries }) {
       alive = false;
     };
   }, [indicator.code]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // While this is the active tab, mirror the chosen indicator into the URL.
+  useEffect(() => {
+    if (active) writeUrl("map", encodeMap({ code: indicator.code }));
+  }, [active, indicator.code]);
 
   const rows = cache[indicator.code];
   const valueMap = useMemo(() => (rows ? buildValueMap(rows, validCodes) : new Map()), [rows, validCodes]);

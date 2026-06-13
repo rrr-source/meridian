@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../lib/i18n";
 import { countryLabel } from "../lib/countries";
 import { fetchLatestAll } from "../lib/api";
 import { END_YEAR } from "../lib/constants";
 import { computeRanking } from "../lib/ranking";
+import { decodeRelocate, encodeRelocate, writeUrl } from "../lib/urlState";
 
 // Criteria offered as toggle chips. Each is self-contained: a World Bank `code`,
 // `monetary` (log-transform on normalize), and `higherIsBetter` — the DIRECTION.
@@ -58,13 +59,27 @@ function recencyCutoff(key) {
   return END_YEAR - opt.years + 1;
 }
 
-export default function Relocate({ countries }) {
-  // Default selection: the original five criteria, each at "Important" — a broad index.
-  const [selected, setSelected] = useState(() => new Set(DEFAULT_SELECTED));
-  const [weights, setWeights] = useState(() => Object.fromEntries(DEFAULT_SELECTED.map((k) => [k, DEFAULT_PRIORITY])));
+export default function Relocate({ countries, active = false, initialParams = null }) {
+  // Initial settings come from the URL when Relocate was the active tab on load
+  // (criteria/priorities, region, recency — all validated; defaults otherwise).
+  // The region is reconciled against the live list once it loads (see below).
+  const urlInit = useMemo(
+    () =>
+      decodeRelocate(initialParams, {
+        critKeys: CRITERIA.map((c) => c.key),
+        recencyKeys: RECENCY_OPTIONS.map((o) => o.key),
+        regions: [], // live region list isn't ready at first mount; reconciled later
+        defaults: { selected: DEFAULT_SELECTED, priority: DEFAULT_PRIORITY, recency: DEFAULT_RECENCY },
+      }),
+    [initialParams]
+  );
+
+  const [selected, setSelected] = useState(() => new Set(urlInit.selected));
+  const [weights, setWeights] = useState(() => ({ ...urlInit.weights }));
   const [cache, setCache] = useState({}); // key -> raw WB rows (loaded once per indicator)
-  const [region, setRegion] = useState("all"); // "all" or a WB region.value
-  const [recency, setRecency] = useState(DEFAULT_RECENCY); // RECENCY_OPTIONS key
+  const [region, setRegion] = useState(urlInit.region); // "all" or a WB region.value
+  const [recency, setRecency] = useState(urlInit.recency); // RECENCY_OPTIONS key
+  const reconciledRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -85,6 +100,18 @@ export default function Relocate({ countries }) {
     if (region === "all") return validCodes;
     return new Set(countries.filter((c) => c.region === region).map((c) => c.id));
   }, [region, countries, validCodes]);
+
+  // Once regions load, drop a URL-supplied region that isn't a real one. Runs once.
+  useEffect(() => {
+    if (reconciledRef.current || countries.length === 0) return;
+    reconciledRef.current = true;
+    setRegion((r) => (r === "all" || regions.includes(r) ? r : "all"));
+  }, [countries, regions]);
+
+  // While this is the active tab, mirror region/recency/criteria+priorities to the URL.
+  useEffect(() => {
+    if (active) writeUrl("relocate", encodeRelocate({ region, recency, selectedKeys: [...selected], weights }));
+  }, [active, region, recency, selected, weights]);
 
   // Load latest values (mrnev=1) for any selected-but-uncached indicator.
   useEffect(() => {

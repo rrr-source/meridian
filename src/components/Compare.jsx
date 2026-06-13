@@ -4,9 +4,10 @@ import { Plus, X, Search } from "lucide-react";
 import { t } from "../lib/i18n";
 import { countryLabel } from "../lib/countries";
 import { fetchSeries } from "../lib/api";
-import { INDICATORS, INDICATOR_LIST, DEFAULT_COMPARE, DEFAULT_COUNTRIES, MAX_COUNTRIES, START_YEAR, END_YEAR } from "../lib/constants";
+import { INDICATOR_LIST, DEFAULT_COUNTRIES, MAX_COUNTRIES, START_YEAR, END_YEAR } from "../lib/constants";
 import { addCountry, removeCountry, initCountrySet, colorForSlot, pairKey, normalizeSeriesFor, buildRows, latestFor } from "../lib/compareData";
 import { describeIndicator, searchIndicators } from "../lib/indicators";
+import { decodeCompare, encodeCompare, writeUrl } from "../lib/urlState";
 import { formatValue, formatAxis } from "../lib/format";
 import { useReducedMotion } from "../lib/useReducedMotion";
 
@@ -17,11 +18,16 @@ const SEARCH_DEBOUNCE_MS = 400;
 let nextChartId = 0;
 const makeChart = (indicator) => ({ id: ++nextChartId, indicator });
 
-export default function Compare({ countries }) {
+export default function Compare({ countries, active = false, initialParams = null }) {
+  // Initial country set + charts come from the URL when Compare was the active tab
+  // on load (validated; defaults otherwise). decodeCompare never throws on bad input.
+  const urlInit = useMemo(() => decodeCompare(initialParams), [initialParams]);
+
   // Shared country set — { code, slot }[] — applies to every chart. Slots give each
   // country a stable palette color across charts and chips (see compareData.js).
-  const [countrySet, setCountrySet] = useState(() => initCountrySet(DEFAULT_COUNTRIES));
-  const [charts, setCharts] = useState(() => DEFAULT_COMPARE.map((key) => makeChart(describeIndicator(INDICATORS[key].code))));
+  const [countrySet, setCountrySet] = useState(() => initCountrySet(urlInit.codes));
+  const [charts, setCharts] = useState(() => urlInit.charts.map((code) => makeChart(describeIndicator(code))));
+  const reconciledRef = useRef(false);
 
   // Series cache, keyed per (indicator, country) PAIR — see compareData.js. Keeping
   // it per-pair (not per whole-set) means removing a country needs no fetch at all,
@@ -42,6 +48,25 @@ export default function Compare({ countries }) {
 
   const codes = useMemo(() => countrySet.map((e) => e.code), [countrySet]);
   const activeIndicatorCodes = useMemo(() => charts.map((c) => c.indicator.code), [charts]);
+
+  // Once the country list loads, drop any URL-supplied code that isn't a real
+  // country (ISO-3 shape passed at mount, but the live list is the source of truth).
+  // Runs once; no user edits can happen before the list — the add UI needs it.
+  useEffect(() => {
+    if (reconciledRef.current || countries.length === 0) return;
+    reconciledRef.current = true;
+    setCountrySet((set) => {
+      const valid = new Set(countries.map((c) => c.id));
+      const pruned = set.filter((e) => valid.has(e.code));
+      if (pruned.length === set.length) return set;
+      return pruned.length ? pruned : initCountrySet(DEFAULT_COUNTRIES);
+    });
+  }, [countries]);
+
+  // While this is the active tab, mirror the country set + chart order into the URL.
+  useEffect(() => {
+    if (active) writeUrl("compare", encodeCompare({ codes, indicatorCodes: activeIndicatorCodes }));
+  }, [active, codes, activeIndicatorCodes]);
 
   // Every (indicator, country) pair currently on screen.
   const neededPairs = useMemo(() => {

@@ -6,15 +6,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Meridian — an atlas of country development built on World Bank Open Data." />
     <title>Meridian</title>
+    <script>
+      // Apply the saved theme BEFORE first paint so a dark reload never flashes light.
+      (function () {
+        try {
+          var t = localStorage.getItem("meridian-theme");
+          document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light");
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      })();
+    </script>
     <!--
       Static pre-React splash: shown instantly while the JS bundle downloads, before
       React mounts. It lives inside #root, so createRoot().render() replaces it on the
       first paint — nothing else is needed to remove it. Inline CSS because the app's
       stylesheet isn't loaded yet at this point. On-brand: ink background, accent-teal
-      globe + spinner, "Meridian" wordmark. prefers-reduced-motion stops the spin.
+      globe + spinner, "Meridian" wordmark. Respects the theme set above (light by
+      default; deep ink in dark). prefers-reduced-motion stops the spin.
     -->
     <style>
       #app-splash {
+        --splash-bg: #f8fafc;
+        --splash-fg: #0f172a;
+        --splash-accent: #0d9488;
         position: fixed;
         inset: 0;
         z-index: 9999;
@@ -23,16 +38,24 @@
         align-items: center;
         justify-content: center;
         gap: 1.5rem;
-        background: #0f172a;
+        background: var(--splash-bg);
         font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+      [data-theme="dark"] #app-splash {
+        --splash-bg: #0a0f1a;
+        --splash-fg: #f1f5f9;
+        --splash-accent: #14b8a6;
       }
       #app-splash .brand {
         display: flex;
         align-items: center;
         gap: 0.625rem;
       }
+      #app-splash .brand svg {
+        stroke: var(--splash-accent);
+      }
       #app-splash .wordmark {
-        color: #ffffff;
+        color: var(--splash-fg);
         font-size: 1.5rem;
         font-weight: 600;
         letter-spacing: -0.01em;
@@ -41,8 +64,8 @@
         width: 28px;
         height: 28px;
         border-radius: 9999px;
-        border: 3px solid rgba(13, 148, 136, 0.25);
-        border-top-color: #0d9488;
+        border: 3px solid color-mix(in srgb, var(--splash-accent) 25%, transparent);
+        border-top-color: var(--splash-accent);
         animation: app-splash-spin 0.8s linear infinite;
       }
       @keyframes app-splash-spin {

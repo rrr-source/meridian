@@ -209,7 +209,7 @@ export default function Relocate({ countries, active = false, initialParams = nu
   return (
     <div className="space-y-6">
       {/* Region + recency filters. */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row">
           <label className="flex flex-1 items-center gap-3">
             <span className="text-sm font-medium text-slate-500">{t("relocate.region")}</span>
@@ -246,7 +246,7 @@ export default function Relocate({ countries, active = false, initialParams = nu
       </section>
 
       {/* Criteria chips */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
         <h2 className="text-sm font-medium text-slate-500">{t("relocate.criteria")}</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           {CRITERIA.map((c) => {
@@ -260,7 +260,7 @@ export default function Relocate({ countries, active = false, initialParams = nu
                 className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                   active
                     ? "border-accent bg-accent text-white"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                    : "border-slate-200 bg-surface text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                 }`}
               >
                 {t(c.labelKey)}
@@ -292,7 +292,7 @@ export default function Relocate({ countries, active = false, initialParams = nu
                           onClick={() => setWeight(c.key, p.value)}
                           aria-pressed={on}
                           className={`flex-1 border-l border-slate-200 px-2 py-1 text-xs font-medium transition-colors first:border-l-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
-                            on ? "bg-accent text-white" : "bg-white text-slate-600 hover:bg-slate-50"
+                            on ? "bg-accent text-white" : "bg-surface text-slate-600 hover:bg-slate-50"
                           }`}
                         >
                           {t(p.labelKey)}
@@ -308,19 +308,19 @@ export default function Relocate({ countries, active = false, initialParams = nu
       </section>
 
       {/* Ranking */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
         <h2 className="text-base font-semibold text-slate-900">{t("relocate.ranking")}</h2>
 
         {/* Non-blocking nudge: one criterion can be misleading (e.g. low formal
             unemployment in a country with no formal labor market). Still rank. */}
         {Array.isArray(ranking) && ranking.length > 0 && activeCount < 2 && (
-          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300">
             {t("relocate.fewCriteriaHint")}
           </p>
         )}
 
         {error ? (
-          <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
             {t("state.error")} {error}
           </p>
         ) : ranking === null ? (

@@ -1,14 +1,45 @@
 @import "tailwindcss";
 
-/* Design tokens become utilities: bg-ink, text-accent, stroke-series-a, etc. */
+/* Class/attribute-based dark mode: `dark:` utilities activate under
+   <html data-theme="dark">. Theme is chosen by the user and persisted (see
+   src/lib/theme.js); an inline script in index.html sets the attribute before
+   first paint to avoid a flash of the wrong theme. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Design tokens become utilities: bg-ink, text-accent, bg-surface, stroke-series-a… */
 @theme {
-  --color-ink: #0f172a;
-  --color-accent: #0d9488;
+  --color-ink: #0f172a; /* header background */
+  --color-accent: #0d9488; /* teal */
+  --color-surface: #ffffff; /* cards / popovers / inputs (distinct from `white`,
+                               which the always-dark header still uses for text) */
   --color-series-a: #ea7a1d;
   --color-series-b: #2563eb;
   --color-series-c: #16a34a;
   --color-series-d: #7c3aed;
   --color-series-e: #db2777;
+}
+
+/* Dark theme. Tailwind v4 emits color utilities as var(--color-…), so re-pointing
+   the slate scale (plus accent/surface/ink) re-themes nearly everything without
+   touching class names. The header is always dark-on-light-text in both themes, so
+   the shades it uses (slate-300/400, white) are deliberately left at their light
+   values; recharts and the map get concrete colors from src/lib/theme.js instead. */
+[data-theme="dark"] {
+  --color-accent: #14b8a6; /* brighter teal — #0d9488 is too dark on dark */
+  --color-surface: #0f172a; /* cards: one step lighter than the canvas */
+  --color-ink: #080d17; /* header: a touch darker than the cards */
+  --color-slate-50: #0a0f1a; /* app canvas + recessed inputs */
+  --color-slate-100: #1e293b; /* hover fills, progress tracks, faint dividers */
+  --color-slate-200: #1e293b; /* borders */
+  --color-slate-500: #94a3b8; /* muted text */
+  --color-slate-600: #cbd5e1; /* body text */
+  --color-slate-700: #e2e8f0; /* strong text */
+  --color-slate-900: #f1f5f9; /* primary text */
+}
+
+/* Page canvas (covers overscroll/edges before the app div paints). Themed via the var. */
+body {
+  background-color: var(--color-slate-50);
 }
 
 /* The signature: every figure is a monospace, tabular-nums "instrument" readout. */

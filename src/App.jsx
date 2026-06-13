@@ -80,6 +80,9 @@ export default function App() {
           <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {t("state.error")} {error}
           </p>
+        ) : countries.length === 0 ? (
+          // Country list still loading — branded spinner, matching the static splash.
+          <Loader />
         ) : (
           // All visited modes stay mounted; only the active one is shown. Hiding
           // (vs. unmounting) is what preserves each mode's state across switches.
@@ -114,6 +117,24 @@ export default function App() {
           </>
         )}
       </main>
+    </div>
+  );
+}
+
+// Centered in-app loader: the accent-teal globe inside a spinning teal ring with a
+// "Loading…" label — the light-background echo of the static splash in index.html.
+// `animate-spin` is paused by the global prefers-reduced-motion rule in index.css.
+function Loader() {
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 py-24" role="status" aria-live="polite">
+      <div className="relative h-12 w-12">
+        <span
+          className="absolute inset-0 animate-spin rounded-full border-[3px] border-accent/20 border-t-accent"
+          aria-hidden="true"
+        />
+        <Globe className="absolute inset-0 m-auto h-6 w-6 text-accent" aria-hidden="true" />
+      </div>
+      <span className="text-sm text-slate-500">{t("state.loading")}</span>
     </div>
   );
 }

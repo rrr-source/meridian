@@ -8,6 +8,7 @@ import { INDICATOR_LIST, DEFAULT_COUNTRIES, MAX_COUNTRIES, START_YEAR, END_YEAR 
 import { addCountry, removeCountry, initCountrySet, colorForSlot, pairKey, normalizeSeriesFor, buildRows, latestFor, logYDomain } from "../lib/compareData";
 import { describeIndicator, searchIndicators } from "../lib/indicators";
 import { decodeCompare, encodeCompare, writeUrl } from "../lib/urlState";
+import { CHART_COLORS } from "../lib/theme";
 import { formatValue, formatAxis } from "../lib/format";
 import { useReducedMotion } from "../lib/useReducedMotion";
 
@@ -19,7 +20,8 @@ const SEARCH_DEBOUNCE_MS = 400;
 let nextChartId = 0;
 const makeChart = (indicator, scale = "linear") => ({ id: ++nextChartId, indicator, scale });
 
-export default function Compare({ countries, active = false, initialParams = null }) {
+export default function Compare({ countries, active = false, initialParams = null, theme = "light" }) {
+  const chartColors = CHART_COLORS[theme] ?? CHART_COLORS.light;
   // Initial country set + charts come from the URL when Compare was the active tab
   // on load (validated; defaults otherwise). decodeCompare never throws on bad input.
   const urlInit = useMemo(() => decodeCompare(initialParams), [initialParams]);
@@ -205,6 +207,7 @@ export default function Compare({ countries, active = false, initialParams = nul
               key={chart.id}
               indicator={chart.indicator}
               scale={chart.scale}
+              chartColors={chartColors}
               data={rows}
               loading={loading}
               errored={errored}
@@ -223,7 +226,7 @@ export default function Compare({ countries, active = false, initialParams = nul
         type="button"
         onClick={addChart}
         disabled={!canAddChart}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-600 transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-surface px-4 py-3 text-sm font-medium text-slate-600 transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <Plus size={16} aria-hidden="true" />
         {t("compare.addChart")}
@@ -241,7 +244,7 @@ function CountryBar({ countrySet, countries, selectedCodes, canAdd, labelFor, on
   );
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+    <section className="rounded-xl border border-slate-200 bg-surface px-4 py-3 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium text-slate-500">{t("compare.countries")}</span>
 
@@ -279,7 +282,7 @@ function CountryBar({ countrySet, countries, selectedCodes, canAdd, labelFor, on
                 if (e.target.value) onAdd(e.target.value);
               }}
               aria-label={t("compare.addCountry")}
-              className="rounded-full border border-dashed border-slate-300 bg-white py-1.5 pl-3 pr-2 text-sm font-medium text-slate-600 hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="rounded-full border border-dashed border-slate-300 bg-surface py-1.5 pl-3 pr-2 text-sm font-medium text-slate-600 hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <option value="">+ {t("compare.addCountry")}</option>
               {available.map((c) => (
@@ -299,7 +302,7 @@ function CountryBar({ countrySet, countries, selectedCodes, canAdd, labelFor, on
   );
 }
 
-function IndicatorCard({ indicator, scale, data, loading, errored, countrySet, labelFor, pickedCodes, onChange, onScaleChange, onRemove }) {
+function IndicatorCard({ indicator, scale, chartColors, data, loading, errored, countrySet, labelFor, pickedCodes, onChange, onScaleChange, onRemove }) {
   const { unit, label } = indicator;
   const reduced = useReducedMotion();
   const rows = data ?? [];
@@ -311,7 +314,7 @@ function IndicatorCard({ indicator, scale, data, loading, errored, countrySet, l
   const logDomain = isLog ? logYDomain(rows, countrySet.map((e) => e.code)) : null;
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <IndicatorPicker value={indicator} pickedCodes={pickedCodes} onChange={onChange} />
@@ -357,17 +360,17 @@ function IndicatorCard({ indicator, scale, data, loading, errored, countrySet, l
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={rows} margin={{ top: 8, right: 12, bottom: 4, left: 8 }}>
-              <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke={chartColors.grid} strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="year"
-                tick={{ fontSize: 12, fill: "#64748b" }}
+                tick={{ fontSize: 12, fill: chartColors.axis }}
                 tickLine={false}
-                axisLine={{ stroke: "#e2e8f0" }}
+                axisLine={{ stroke: chartColors.grid }}
                 minTickGap={40}
               />
               <YAxis
                 width={64}
-                tick={{ fontSize: 12, fill: "#64748b" }}
+                tick={{ fontSize: 12, fill: chartColors.axis }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(v) => formatAxis(v, unit)}
@@ -378,7 +381,15 @@ function IndicatorCard({ indicator, scale, data, loading, errored, countrySet, l
               <Tooltip
                 labelFormatter={(y) => String(y)}
                 formatter={(value, name) => [formatValue(value, unit), name]}
-                contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
+                contentStyle={{
+                  fontSize: 12,
+                  borderRadius: 8,
+                  border: `1px solid ${chartColors.tooltipBorder}`,
+                  backgroundColor: chartColors.tooltipBg,
+                  color: chartColors.tooltipText,
+                }}
+                labelStyle={{ color: chartColors.tooltipText }}
+                itemStyle={{ color: chartColors.tooltipText }}
               />
               {countrySet.map((entry) => (
                 <Line
@@ -502,13 +513,13 @@ function IndicatorPicker({ value, pickedCodes, onChange }) {
             onFocus={() => setOpen(true)}
             placeholder={t("compare.searchPlaceholder")}
             aria-label={t("compare.searchLabel")}
-            className="w-full rounded-md border border-slate-200 bg-white py-2 pl-8 pr-2 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="w-full rounded-md border border-slate-200 bg-surface py-2 pl-8 pr-2 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           />
         </div>
       </div>
 
       {open && query.trim() && (
-        <ul className="absolute right-0 z-10 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg sm:w-72">
+        <ul className="absolute right-0 z-10 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-slate-200 bg-surface py-1 text-sm shadow-lg sm:w-72">
           {searching ? (
             <li className="px-3 py-2 text-slate-500">{t("compare.searching")}</li>
           ) : results.length === 0 ? (
@@ -560,7 +571,7 @@ function ScaleToggle({ scale, onChange }) {
             onClick={() => onChange(value)}
             aria-pressed={on}
             className={`border-l border-slate-200 px-2.5 py-1 text-xs font-medium transition-colors first:border-l-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
-              on ? "bg-accent text-white" : "bg-white text-slate-600 hover:bg-slate-50"
+              on ? "bg-accent text-white" : "bg-surface text-slate-600 hover:bg-slate-50"
             }`}
           >
             {labelText}

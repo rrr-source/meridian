@@ -12,6 +12,9 @@ const messages = {
     "tab.relocate": "Relocate",
     "tab.map": "World map",
 
+    "theme.toDark": "Switch to dark theme",
+    "theme.toLight": "Switch to light theme",
+
     "state.loading": "Loading…",
     "state.empty": "No data available.",
     "state.error": "Could not load data.",

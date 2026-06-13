@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Globe } from "lucide-react";
+import { Globe, Moon, Sun } from "lucide-react";
 import { t } from "./lib/i18n";
 import { fetchCountries } from "./lib/api";
 import { readTab, readSearchParams } from "./lib/urlState";
+import { getInitialTheme, applyTheme } from "./lib/theme";
 import Compare from "./components/Compare";
 import Relocate from "./components/Relocate";
 import WorldMap from "./components/WorldMap";
@@ -27,11 +28,16 @@ export default function App() {
   const [visited, setVisited] = useState(() => new Set([initialTab]));
   const [countries, setCountries] = useState([]);
   const [error, setError] = useState(null);
+  // Theme is light by default; the index.html inline script already applied any saved
+  // choice to <html> before paint, so we just read it back as the initial state.
+  const [theme, setTheme] = useState(getInitialTheme);
 
   const selectTab = (id) => {
     setTab(id);
     setVisited((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
   };
+
+  const toggleTheme = () => setTheme((prev) => applyTheme(prev === "dark" ? "light" : "dark"));
 
   // Load the country list once; every mode reuses it.
   useEffect(() => {
@@ -46,13 +52,23 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="bg-ink text-white">
+      <header className="border-b border-transparent bg-ink text-white dark:border-slate-800">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-4">
           <Globe className="h-7 w-7 shrink-0 text-accent" aria-hidden="true" />
           <div className="mr-auto">
             <h1 className="text-xl font-semibold leading-tight">{t("app.title")}</h1>
             <p className="text-sm text-slate-400">{t("app.subtitle")}</p>
           </div>
+
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? t("theme.toLight") : t("theme.toDark")}
+            title={theme === "dark" ? t("theme.toLight") : t("theme.toDark")}
+            className="rounded-md p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            {theme === "dark" ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
+          </button>
 
           <nav aria-label="Modes" className="flex gap-1 rounded-lg bg-white/5 p-1">
             {TABS.map((tb) => {
@@ -77,7 +93,7 @@ export default function App() {
 
       <main className="mx-auto max-w-6xl px-4 py-6">
         {error ? (
-          <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
             {t("state.error")} {error}
           </p>
         ) : countries.length === 0 ? (
@@ -93,6 +109,7 @@ export default function App() {
                   countries={countries}
                   active={tab === "compare"}
                   initialParams={initialTab === "compare" ? initialParams : null}
+                  theme={theme}
                 />
               )}
             </div>
@@ -111,6 +128,7 @@ export default function App() {
                   countries={countries}
                   active={tab === "map"}
                   initialParams={initialTab === "map" ? initialParams : null}
+                  theme={theme}
                 />
               )}
             </div>

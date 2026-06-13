@@ -8,8 +8,9 @@ import { fetchLatestAll } from "../lib/api";
 import { INDICATORS, INDICATOR_LIST } from "../lib/constants";
 import { describeIndicator, searchIndicators } from "../lib/indicators";
 import { decodeMap, encodeMap, writeUrl } from "../lib/urlState";
+import { MAP_COLORS } from "../lib/theme";
 import { formatValue } from "../lib/format";
-import { GEO_URL, GEO_ISO3_SET, NO_DATA_COLOR, RAMP_FROM, RAMP_TO, iso3ForGeo, buildValueMap, makeColorScale } from "../lib/worldMap";
+import { GEO_URL, GEO_ISO3_SET, RAMP_FROM, RAMP_TO, iso3ForGeo, buildValueMap, makeColorScale } from "../lib/worldMap";
 
 const SEARCH_DEBOUNCE_MS = 400;
 const DEFAULT_INDICATOR = describeIndicator(INDICATORS.gdppc.code); // GDP per capita
@@ -31,7 +32,8 @@ const projection = geoMiller()
   .scale(MAP_W / (2 * Math.PI))
   .translate([MAP_W / 2, 260.83]);
 
-export default function WorldMap({ countries, active = false, initialParams = null }) {
+export default function WorldMap({ countries, active = false, initialParams = null, theme = "light" }) {
+  const mapColors = MAP_COLORS[theme] ?? MAP_COLORS.light;
   // Chosen indicator survives tab switches (this panel stays mounted — see App.jsx),
   // and is restored from the URL when the World map was the active tab on load.
   const [indicator, setIndicator] = useState(() =>
@@ -111,14 +113,14 @@ export default function WorldMap({ countries, active = false, initialParams = nu
   return (
     <div className="space-y-6">
       {/* Indicator picker */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
         <IndicatorPicker value={indicator} onChange={setIndicator} />
       </section>
 
       {/* Map */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
         {error ? (
-          <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
             {t("state.error")} {error}
           </p>
         ) : (
@@ -127,14 +129,14 @@ export default function WorldMap({ countries, active = false, initialParams = nu
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
               <Legend min={scale.min} max={scale.max} unit={indicator.unit} ready={ready} />
               <span className="inline-flex items-center gap-2 text-xs text-slate-500">
-                <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: NO_DATA_COLOR }} aria-hidden="true" />
+                <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: mapColors.noData }} aria-hidden="true" />
                 {t("map.noData")}
               </span>
             </div>
 
             <div ref={wrapRef} className="relative mt-4">
               {loading && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 text-sm text-slate-500">
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface/70 text-sm text-slate-500">
                   {t("state.loading")}
                 </div>
               )}
@@ -152,13 +154,13 @@ export default function WorldMap({ countries, active = false, initialParams = nu
                       .map((geo) => {
                       const code = iso3ForGeo(geo);
                       const datum = code ? valueMap.get(code) : null;
-                      const fill = datum ? scale.colorFor(datum.value) : NO_DATA_COLOR;
+                      const fill = datum ? scale.colorFor(datum.value) : mapColors.noData;
                       return (
                         <Geography
                           key={geo.rsmKey}
                           geography={geo}
                           fill={fill}
-                          stroke="#fff"
+                          stroke={mapColors.border}
                           strokeWidth={0.4}
                           onMouseEnter={(e) => showTip(geo, e)}
                           onMouseMove={(e) => showTip(geo, e)}
@@ -177,7 +179,7 @@ export default function WorldMap({ countries, active = false, initialParams = nu
 
               {tip && (
                 <div
-                  className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs shadow-md"
+                  className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-md border border-slate-200 bg-surface px-2.5 py-1.5 text-xs shadow-md"
                   style={{ left: tip.x, top: tip.y - 8 }}
                 >
                   <div className="font-medium text-slate-900">{tip.name}</div>
@@ -203,7 +205,7 @@ export default function WorldMap({ countries, active = false, initialParams = nu
       {/* Highest / Lowest top-lists — full width below the map; two columns that stack
           on mobile. Reuse the map's already-fetched values; update with the indicator. */}
       {ready && topLists.highest.length > 0 && (
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
           <div className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
             <TopList title={t("map.highest")} rows={topLists.highest} byId={byId} unit={indicator.unit} />
             <TopList title={t("map.lowest")} rows={topLists.lowest} byId={byId} unit={indicator.unit} />
@@ -329,13 +331,13 @@ function IndicatorPicker({ value, onChange }) {
             onFocus={() => setOpen(true)}
             placeholder={t("map.searchPlaceholder")}
             aria-label={t("map.searchLabel")}
-            className="w-full rounded-md border border-slate-200 bg-white py-2 pl-8 pr-2 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="w-full rounded-md border border-slate-200 bg-surface py-2 pl-8 pr-2 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           />
         </div>
       </div>
 
       {open && query.trim() && (
-        <ul className="absolute right-0 z-30 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg sm:w-72">
+        <ul className="absolute right-0 z-30 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-slate-200 bg-surface py-1 text-sm shadow-lg sm:w-72">
           {searching ? (
             <li className="px-3 py-2 text-slate-500">{t("map.searching")}</li>
           ) : results.length === 0 ? (

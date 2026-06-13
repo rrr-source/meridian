@@ -1,70 +1,51 @@
-// Relocate ranking math — robust to outliers.
+// Relocate ranking math — percentile-rank normalization.
 //
-// Why this shape: monetary indicators (GDP/capita, health spend) are heavy-tailed
-// across countries, so we log them to compress the scale. Then we winsorize at the
-// 5th/95th percentile to trim extreme outliers (e.g. oil micro-states) before a
-// min-max stretch to 0..100 — so the ranking reflects broad quality of life, not a
-// single stretched axis dominated by a handful of countries.
+// Why this shape: each country's per-criterion score is its PERCENTILE RANK within
+// the filtered set (region + recency) — the share of countries it scores at or below,
+// mapped to 0..100. Rank is scale-invariant, so heavy-tailed monetary series need no
+// log step and a handful of outliers can't stretch the axis. Scores spread evenly
+// across [0,100] instead of piling up at 100 the way winsorize+min-max did.
 //
 // This module is pure (no React, no imports) so it can be unit-tested directly.
 
-// Percentile of an ascending-sorted array. p in [0,1].
-// index = p*(n-1), with linear interpolation between neighbors.
-export function percentile(sortedAsc, p) {
-  const n = sortedAsc.length;
-  if (n === 0) return NaN;
-  if (n === 1) return sortedAsc[0];
-  const idx = p * (n - 1);
-  const lo = Math.floor(idx);
-  const hi = Math.ceil(idx);
-  if (lo === hi) return sortedAsc[lo];
-  return sortedAsc[lo] + (sortedAsc[hi] - sortedAsc[lo]) * (idx - lo);
-}
-
-const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
-
-// Normalize one indicator's values to 0..100:
-//   1. (monetary) replace each value with Math.log(value), skipping value <= 0
-//   2. compute p5 and p95 of the (possibly logged) values
-//   3. winsorize: clip every value to [p5, p95]
-//   4. min-max: norm = (v - p5) / (p95 - p5) * 100, clamped to [0, 100]
-//   5. (higherIsBetter === false) invert: norm → 100 - norm, so a LOW raw value
+// Normalize one indicator's values to a 0..100 percentile rank within `valueMap`:
+//   1. drop missing/NaN values
+//   2. sort ascending; each country's rank = its average position (ties share a
+//      position) over n-1, times 100 — lowest value → 0, highest → 100
+//   3. (higherIsBetter === false) invert: rank → 100 - rank, so a LOW raw value
 //      (e.g. low unemployment, low homicide rate) maps to a HIGH 0..100 score.
-// valueMap: Map<code, rawValue>. Returns Map<code, norm>.
-export function normalizeIndicator(valueMap, monetary, higherIsBetter = true) {
-  const transformed = new Map(); // code -> (possibly logged) value
+// valueMap: Map<code, rawValue>. Returns Map<code, score>.
+export function normalizeIndicator(valueMap, higherIsBetter = true) {
+  const entries = [];
   for (const [code, raw] of valueMap) {
     if (raw == null || Number.isNaN(raw)) continue;
-    if (monetary) {
-      if (raw <= 0) continue; // log undefined for non-positive money → treat as missing
-      transformed.set(code, Math.log(raw));
-    } else {
-      transformed.set(code, raw);
-    }
+    entries.push([code, raw]);
   }
 
-  const sorted = [...transformed.values()].sort((a, b) => a - b);
-  const p5 = percentile(sorted, 0.05);
-  const p95 = percentile(sorted, 0.95);
-  const range = p95 - p5;
-
   const norm = new Map();
-  for (const [code, v] of transformed) {
-    let score;
-    if (range <= 0) {
-      score = 50; // degenerate spread → neutral score
-    } else {
-      const clipped = clamp(v, p5, p95);
-      score = clamp(((clipped - p5) / range) * 100, 0, 100);
-    }
-    // Direction: for "lower is better" criteria, flip so low raw → high score.
-    norm.set(code, higherIsBetter ? score : 100 - score);
+  const n = entries.length;
+  if (n === 0) return norm;
+  if (n === 1) {
+    norm.set(entries[0][0], 50); // a single country → neutral score
+    return norm;
+  }
+
+  // Ascending by value; tie groups share their average index so equal raw values
+  // get an identical rank (no arbitrary ordering within a tie).
+  entries.sort((a, b) => a[1] - b[1]);
+  for (let i = 0; i < n; ) {
+    let j = i;
+    while (j + 1 < n && entries[j + 1][1] === entries[i][1]) j++;
+    const rank = (((i + j) / 2) / (n - 1)) * 100; // average position of the tie group
+    const score = higherIsBetter ? rank : 100 - rank;
+    for (let k = i; k <= j; k++) norm.set(entries[k][0], score);
+    i = j + 1;
   }
   return norm;
 }
 
 // Country index = Σ(norm_i * weight_i) / Σ(weight_i), over active indicators.
-// activeIndicators: [{ key, monetary, higherIsBetter }]; weights: { [key]: number };
+// activeIndicators: [{ key, higherIsBetter }]; weights: { [key]: number };
 // valueMaps: { [key]: Map<code, rawValue> }.
 // Only countries with data for ALL selected criteria are ranked. Sorted descending.
 export function computeRanking(activeIndicators, weights, valueMaps) {
@@ -74,7 +55,7 @@ export function computeRanking(activeIndicators, weights, valueMaps) {
 
   const norms = activeIndicators.map((ind) => ({
     weight: weights[ind.key] ?? 0,
-    norm: normalizeIndicator(valueMaps[ind.key] ?? new Map(), ind.monetary, ind.higherIsBetter ?? true),
+    norm: normalizeIndicator(valueMaps[ind.key] ?? new Map(), ind.higherIsBetter ?? true),
   }));
 
   // Candidates come from the first indicator; a ranked country must appear in ALL.

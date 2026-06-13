@@ -2,8 +2,8 @@
 
 **An atlas of country development, built on [World Bank Open Data](https://data.worldbank.org/).**
 Compare up to five countries across decades on any indicator, rank places to live
-by what you care about, and test how well you know the world's development curves —
-all from live data, no API key required.
+by what you care about, and color the whole world by a chosen indicator on an
+interactive map — all from live data, no API key required.
 
 ![Meridian screenshot](docs/screenshot.png)
 
@@ -14,6 +14,7 @@ all from live data, no API key required.
 - [Vite](https://vitejs.dev/) + [React](https://react.dev/) (JavaScript)
 - [Tailwind CSS v4](https://tailwindcss.com/) (via the `@tailwindcss/vite` plugin — no `tailwind.config.js`)
 - [recharts](https://recharts.org/) for charts
+- [react-simple-maps](https://www.react-simple-maps.io/) + [d3-geo-projection](https://github.com/d3/d3-geo-projection) for the world map
 - [lucide-react](https://lucide.dev/) for icons
 
 ## Getting started
@@ -37,14 +38,23 @@ npm run preview    # serve the build locally
   choose, from a curated list of ~24 presets **or** a live search over the full
   World Bank WDI catalog (~1,486 indicators). The latest value for each country is
   called out above every chart. The same indicator can't be charted twice at once.
-- **Relocate** — choose what matters (income, healthcare, urbanization, internet,
-  longevity), weight each criterion, and get a ranked shortlist of countries. Narrow
-  it to a single World Bank region, and set a data-recency threshold (last 3, 5, or
-  10 years, or all time — default 5) so the ranking only uses sufficiently fresh
-  figures; each country shows the year its data comes from. The index is robust to
-  outliers (see the note below).
-- **Quiz** — a country's GDP-per-capita curve is drawn with no label; guess which
-  country it is from four options, and keep score.
+- **Relocate** — pick the criteria that matter from **13 development indicators**
+  (income, unemployment, inflation, healthcare, longevity, infant mortality, safety,
+  internet, electricity, clean water, urbanization, literacy, CO₂ per capita) and
+  give each one a **priority** — _Not important_ / _Important_ / _Very important_.
+  Direction is built in: for "lower is better" criteria (unemployment, inflation,
+  infant mortality, homicide rate, CO₂) a low value scores high. Narrow the field to
+  a single World Bank region, and set a data-recency threshold (last 3, 5, or 10
+  years, or all time — default 5) so only sufficiently fresh figures count; each
+  country shows the year its data comes from. The result is a ranked shortlist (see
+  the note below on how it's scored).
+- **World map** — an interactive choropleth (Miller projection) that colors every
+  country by a chosen indicator, using the **same preset list and live WDI catalog
+  search as Compare** (default: GDP per capita). Each country is shaded on a
+  light-to-dark teal scale from its latest available value; countries with no data —
+  or too small to draw on the basemap — are left gray. Hover any country for a
+  tooltip with its name, value, and data year, and read the scale from the min/max
+  legend.
 
 ## Data
 
@@ -55,7 +65,8 @@ World Bank data lags ~1–2 years, so the time series end at last year and the "
 recent" value for a given country is typically from **2023–2024**, not the current
 year — and different countries' latest values can come from different years. That
 mismatch is exactly why Relocate exposes the per-country data year and a recency
-threshold, instead of silently mixing stale and fresh numbers.
+threshold (instead of silently mixing stale and fresh numbers), and why the World
+map's tooltip always shows each country's value alongside the year it's from.
 
 ## Adding a new indicator
 
@@ -70,35 +81,37 @@ gni: { key: "gni", code: "NY.GNP.PCAP.CD", label: "GNI per capita (Atlas)", unit
 - `unit` drives formatting: `"$"`, `"%"`, `"yrs"`, and `"ppl"` are handled
   specially; any other string (e.g. `"per 1,000"`, `"t"`) is rendered as a suffix,
   and an empty/unknown unit falls back to compact `K`/`M`/`B` numbers — which is
-  also what indicators picked via Compare's catalog search use.
-- Set `monetary: true` for money values — the Relocate ranking log-transforms them.
+  also what indicators picked via catalog search use.
+- Set `monetary: true` for money values — they're heavy-tailed across countries, so
+  the World map places them on a logarithmic color ramp.
 
-You don't have to touch the presets to chart something one-off: Compare's per-chart
-search box reaches the whole WDI catalog directly.
+You don't have to touch the presets to chart or map something one-off: the catalog
+search box in both Compare and the World map reaches the whole WDI catalog directly.
 
 ## A note on the Relocate ranking
 
 The ranking is a **simplified livability index**, not an authoritative one. For each
-selected criterion, monetary values are log-scaled, then every value is winsorized at
-the 5th/95th percentile and min-max normalized to 0–100; the country score is the
-weighted average across criteria. The log + winsorize steps keep a few extreme
-outliers (e.g. oil micro-states) from dominating, so the result reflects broad
-quality of life rather than a single stretched axis. When a region or recency filter
-is active, those percentile bounds are recomputed over just the countries that pass —
-so "best in Europe" is ranked relative to Europe, not the world.
+selected criterion, every country is scored by its **percentile rank** within the
+filtered set (0–100) — its standing among the countries that pass the active region
+and recency filters. "Lower is better" criteria are inverted, so a low raw value
+earns a high score, and a country's overall index is the **priority-weighted
+average** of those per-criterion scores (_Very important_ counts double _Important_;
+_Not important_ drops the criterion entirely). Scoring by percentile is naturally
+robust to outliers and is recomputed whenever the filters change — so "best in
+Europe" is ranked relative to Europe, not the world.
 
 ## Roadmap
 
-- **Richer Quiz mode** — multi-indicator clues instead of GDP-per-capita alone,
-  which is hard to guess.
-- **More Relocate criteria** — expose more of the preset indicators as weightable
-  livability criteria.
-- **A world map view** — choropleths alongside the line charts.
-- **Linear / log scale toggle for Compare** — switch the Y axis per chart.
+- **World-map year slider** _(deferred)_ — animate the choropleth across time instead
+  of showing only the latest value per country.
 - **Shareable URL state** — encode the current selection so a view can be linked.
+- **Linear / log scale toggle for Compare** — switch the Y axis per chart.
 - **Full i18n / localized country names** — the i18n seam and country-name resolver
   are already in place; this fills in additional locales.
+- **Dark mode** — a dark theme for the instrument-panel look.
 
 ## License
 
 [MIT](LICENSE)
+</content>
+</invoke>

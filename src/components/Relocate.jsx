@@ -2,18 +2,42 @@ import { useEffect, useMemo, useState } from "react";
 import { t } from "../lib/i18n";
 import { countryLabel } from "../lib/countries";
 import { fetchLatestAll } from "../lib/api";
-import { INDICATORS, ACCENT, END_YEAR } from "../lib/constants";
+import { END_YEAR } from "../lib/constants";
 import { computeRanking } from "../lib/ranking";
 
-// Criteria offered as toggle chips. Each maps to an indicator key.
+// Criteria offered as toggle chips. Each is self-contained: a World Bank `code`,
+// `monetary` (log-transform on normalize), and `higherIsBetter` — the DIRECTION.
+// For higherIsBetter: false the normalized 0..100 score is inverted, so a low raw
+// value (low unemployment, low homicide rate, low CO₂) earns a HIGH livability
+// score. Without this, high unemployment/inflation/mortality would rank as "good".
 const CRITERIA = [
-  { key: "gdppc", labelKey: "relocate.crit.income" },
-  { key: "health", labelKey: "relocate.crit.healthcare" },
-  { key: "urban", labelKey: "relocate.crit.urbanization" },
-  { key: "internet", labelKey: "relocate.crit.internet" },
-  { key: "life", labelKey: "relocate.crit.longevity" },
+  { key: "income", labelKey: "relocate.crit.income", code: "NY.GDP.PCAP.CD", monetary: true, higherIsBetter: true },
+  { key: "unemployment", labelKey: "relocate.crit.unemployment", code: "SL.UEM.TOTL.ZS", monetary: false, higherIsBetter: false },
+  { key: "inflation", labelKey: "relocate.crit.inflation", code: "FP.CPI.TOTL.ZG", monetary: false, higherIsBetter: false },
+  { key: "healthcare", labelKey: "relocate.crit.healthcare", code: "SH.XPD.CHEX.PC.CD", monetary: true, higherIsBetter: true },
+  { key: "longevity", labelKey: "relocate.crit.longevity", code: "SP.DYN.LE00.IN", monetary: false, higherIsBetter: true },
+  { key: "infantmort", labelKey: "relocate.crit.infantmort", code: "SP.DYN.IMRT.IN", monetary: false, higherIsBetter: false },
+  { key: "safety", labelKey: "relocate.crit.safety", code: "VC.IHR.PSRC.P5", monetary: false, higherIsBetter: false },
+  { key: "internet", labelKey: "relocate.crit.internet", code: "IT.NET.USER.ZS", monetary: false, higherIsBetter: true },
+  { key: "electricity", labelKey: "relocate.crit.electricity", code: "EG.ELC.ACCS.ZS", monetary: false, higherIsBetter: true },
+  { key: "water", labelKey: "relocate.crit.water", code: "SH.H2O.BASW.ZS", monetary: false, higherIsBetter: true },
+  { key: "urban", labelKey: "relocate.crit.urbanization", code: "SP.URB.TOTL.IN.ZS", monetary: false, higherIsBetter: true },
+  { key: "literacy", labelKey: "relocate.crit.literacy", code: "SE.ADT.LITR.ZS", monetary: false, higherIsBetter: true },
+  { key: "co2", labelKey: "relocate.crit.co2", code: "EN.GHG.CO2.PC.CE.AR5", monetary: false, higherIsBetter: false },
 ];
-const DEFAULT_WEIGHT = 50;
+const CRIT_BY_KEY = Object.fromEntries(CRITERIA.map((c) => [c.key, c]));
+
+// Selected on first load — the original broad index, so existing behavior is recognizable.
+const DEFAULT_SELECTED = ["income", "healthcare", "urban", "internet", "longevity"];
+
+// 3-level priority → weight in the weighted average. "Not important" (0) drops the
+// criterion from the score; the others give Very important twice the pull of Important.
+const PRIORITY_LEVELS = [
+  { value: 0, labelKey: "relocate.priority.not" },
+  { value: 1, labelKey: "relocate.priority.important" },
+  { value: 2, labelKey: "relocate.priority.very" },
+];
+const DEFAULT_PRIORITY = 1; // new selections start at "Important"
 const TOP_N = 15;
 
 // Recency windows, in years back from the freshest possible data year (END_YEAR,
@@ -35,9 +59,9 @@ function recencyCutoff(key) {
 }
 
 export default function Relocate({ countries }) {
-  // Default selection: all five criteria active, equal weight — a broad index.
-  const [selected, setSelected] = useState(() => new Set(CRITERIA.map((c) => c.key)));
-  const [weights, setWeights] = useState(() => Object.fromEntries(CRITERIA.map((c) => [c.key, DEFAULT_WEIGHT])));
+  // Default selection: the original five criteria, each at "Important" — a broad index.
+  const [selected, setSelected] = useState(() => new Set(DEFAULT_SELECTED));
+  const [weights, setWeights] = useState(() => Object.fromEntries(DEFAULT_SELECTED.map((k) => [k, DEFAULT_PRIORITY])));
   const [cache, setCache] = useState({}); // key -> raw WB rows (loaded once per indicator)
   const [region, setRegion] = useState("all"); // "all" or a WB region.value
   const [recency, setRecency] = useState(DEFAULT_RECENCY); // RECENCY_OPTIONS key
@@ -70,7 +94,7 @@ export default function Relocate({ countries }) {
     let alive = true;
     setLoading(true);
     setError(null);
-    Promise.all(missing.map((k) => fetchLatestAll(INDICATORS[k].code).then((rows) => [k, rows])))
+    Promise.all(missing.map((k) => fetchLatestAll(CRIT_BY_KEY[k].code).then((rows) => [k, rows])))
       .then((results) => {
         if (!alive) return;
         setCache((prev) => {
@@ -129,7 +153,7 @@ export default function Relocate({ countries }) {
       }
     }
 
-    const activeIndicators = activeKeys.map((k) => INDICATORS[k]);
+    const activeIndicators = activeKeys.map((k) => CRIT_BY_KEY[k]);
     const result = computeRanking(activeIndicators, weights, valueMaps);
     return result.map((row) => ({ ...row, year: dataYear.get(row.code) ?? null }));
   }, [selected, weights, cache, regionCodes, recency, countries.length]);
@@ -141,12 +165,15 @@ export default function Relocate({ countries }) {
       : t("relocate.recencyCaption", { n: recencyYears });
   const someWeight = [...selected].some((k) => (weights[k] ?? 0) > 0);
 
-  const toggle = (key) =>
+  const toggle = (key) => {
     setSelected((prev) => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
+    // First time a criterion is turned on, give it the default priority.
+    setWeights((prev) => (key in prev ? prev : { ...prev, [key]: DEFAULT_PRIORITY }));
+  };
 
   const setWeight = (key, value) => setWeights((prev) => ({ ...prev, [key]: value }));
 
@@ -213,27 +240,40 @@ export default function Relocate({ countries }) {
           })}
         </div>
 
-        {/* Per-criterion weight sliders */}
+        {/* Per-criterion priority: a compact 3-level segmented control instead of a
+            slider — scales to 13 criteria and drops the false precision of 0–100. */}
         {selected.size > 0 && (
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            {CRITERIA.filter((c) => selected.has(c.key)).map((c) => (
-              <label key={c.key} className="block">
-                <div className="flex items-baseline justify-between">
+            {CRITERIA.filter((c) => selected.has(c.key)).map((c) => {
+              const level = weights[c.key] ?? DEFAULT_PRIORITY;
+              return (
+                <div key={c.key}>
                   <span className="text-sm text-slate-600">{t(c.labelKey)}</span>
-                  <span className="num text-sm font-semibold text-slate-900">{weights[c.key]}</span>
+                  <div
+                    role="group"
+                    aria-label={`${t(c.labelKey)} ${t("relocate.priority")}`}
+                    className="mt-1 flex overflow-hidden rounded-md border border-slate-200"
+                  >
+                    {PRIORITY_LEVELS.map((p) => {
+                      const on = level === p.value;
+                      return (
+                        <button
+                          key={p.value}
+                          type="button"
+                          onClick={() => setWeight(c.key, p.value)}
+                          aria-pressed={on}
+                          className={`flex-1 border-l border-slate-200 px-2 py-1 text-xs font-medium transition-colors first:border-l-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
+                            on ? "bg-accent text-white" : "bg-white text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          {t(p.labelKey)}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={weights[c.key]}
-                  onChange={(e) => setWeight(c.key, Number(e.target.value))}
-                  style={{ accentColor: ACCENT }}
-                  className="mt-1 w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  aria-label={`${t(c.labelKey)} ${t("relocate.weight")}`}
-                />
-              </label>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

@@ -28,8 +28,10 @@ const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 //   2. compute p5 and p95 of the (possibly logged) values
 //   3. winsorize: clip every value to [p5, p95]
 //   4. min-max: norm = (v - p5) / (p95 - p5) * 100, clamped to [0, 100]
+//   5. (higherIsBetter === false) invert: norm → 100 - norm, so a LOW raw value
+//      (e.g. low unemployment, low homicide rate) maps to a HIGH 0..100 score.
 // valueMap: Map<code, rawValue>. Returns Map<code, norm>.
-export function normalizeIndicator(valueMap, monetary) {
+export function normalizeIndicator(valueMap, monetary, higherIsBetter = true) {
   const transformed = new Map(); // code -> (possibly logged) value
   for (const [code, raw] of valueMap) {
     if (raw == null || Number.isNaN(raw)) continue;
@@ -48,18 +50,21 @@ export function normalizeIndicator(valueMap, monetary) {
 
   const norm = new Map();
   for (const [code, v] of transformed) {
+    let score;
     if (range <= 0) {
-      norm.set(code, 50); // degenerate spread → neutral score
+      score = 50; // degenerate spread → neutral score
     } else {
       const clipped = clamp(v, p5, p95);
-      norm.set(code, clamp(((clipped - p5) / range) * 100, 0, 100));
+      score = clamp(((clipped - p5) / range) * 100, 0, 100);
     }
+    // Direction: for "lower is better" criteria, flip so low raw → high score.
+    norm.set(code, higherIsBetter ? score : 100 - score);
   }
   return norm;
 }
 
 // Country index = Σ(norm_i * weight_i) / Σ(weight_i), over active indicators.
-// activeIndicators: [{ key, monetary }]; weights: { [key]: number };
+// activeIndicators: [{ key, monetary, higherIsBetter }]; weights: { [key]: number };
 // valueMaps: { [key]: Map<code, rawValue> }.
 // Only countries with data for ALL selected criteria are ranked. Sorted descending.
 export function computeRanking(activeIndicators, weights, valueMaps) {
@@ -69,7 +74,7 @@ export function computeRanking(activeIndicators, weights, valueMaps) {
 
   const norms = activeIndicators.map((ind) => ({
     weight: weights[ind.key] ?? 0,
-    norm: normalizeIndicator(valueMaps[ind.key] ?? new Map(), ind.monetary),
+    norm: normalizeIndicator(valueMaps[ind.key] ?? new Map(), ind.monetary, ind.higherIsBetter ?? true),
   }));
 
   // Candidates come from the first indicator; a ranked country must appear in ALL.

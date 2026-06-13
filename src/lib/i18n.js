@@ -10,7 +10,7 @@ const messages = {
 
     "tab.compare": "Compare",
     "tab.relocate": "Relocate",
-    "tab.quiz": "Quiz",
+    "tab.map": "World map",
 
     "state.loading": "Loading…",
     "state.empty": "No data available.",
@@ -68,10 +68,19 @@ const messages = {
     "relocate.note":
       "A simplified livability index: each criterion scores every country by its percentile rank within the filtered set (region and recency), then the scores are combined by your priorities. Ranking sidesteps outliers, so scores spread evenly rather than piling up at the top.",
 
-    "quiz.prompt": "Which country's GDP per capita is this?",
-    "quiz.axisLabel": "GDP per capita ($)",
-    "quiz.next": "Next question",
-    "quiz.score": "Score",
+    "map.indicator": "Indicator",
+    "map.searchPlaceholder": "Search the World Bank catalog…",
+    "map.searchLabel": "Search indicators",
+    "map.searching": "Searching…",
+    "map.noResults": "No matching indicators.",
+    "map.presetGroup": "Preset indicators",
+    "map.customOption": "Searched: {label}",
+    "map.noData": "No data",
+    "map.legendLow": "Low",
+    "map.legendHigh": "High",
+    "map.coverage": "{matched} of {total} countries have data for this indicator.",
+    "map.note":
+      "Latest available value per country (World Bank, most recent non-empty year). Microstates and a few territories are absent from this low-resolution basemap and show as no data.",
   },
 };
 

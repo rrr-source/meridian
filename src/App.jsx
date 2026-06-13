@@ -4,20 +4,20 @@ import { t } from "./lib/i18n";
 import { fetchCountries } from "./lib/api";
 import Compare from "./components/Compare";
 import Relocate from "./components/Relocate";
-import Quiz from "./components/Quiz";
+import WorldMap from "./components/WorldMap";
 
 const TABS = [
   { id: "compare", labelKey: "tab.compare" },
   { id: "relocate", labelKey: "tab.relocate" },
-  { id: "quiz", labelKey: "tab.quiz" },
+  { id: "map", labelKey: "tab.map" },
 ];
 
 export default function App() {
   const [tab, setTab] = useState("compare");
   // Modes are kept mounted once visited so their in-memory state (Compare's
-  // countries/charts, Relocate's weights/ranking, Quiz's score/round) survives tab
-  // switches. We lazy-mount on first visit so each mode's charts first measure while
-  // visible (recharts can't size inside a display:none panel), then stay alive.
+  // countries/charts, Relocate's weights/ranking, World map's indicator) survives tab
+  // switches. We lazy-mount on first visit so each mode's charts/map first measure
+  // while visible (recharts can't size inside a display:none panel), then stay alive.
   const [visited, setVisited] = useState(() => new Set([tab]));
   const [countries, setCountries] = useState([]);
   const [error, setError] = useState(null);
@@ -84,8 +84,8 @@ export default function App() {
             <div hidden={tab !== "relocate"}>
               {visited.has("relocate") && <Relocate countries={countries} />}
             </div>
-            <div hidden={tab !== "quiz"}>
-              {visited.has("quiz") && <Quiz countries={countries} />}
+            <div hidden={tab !== "map"}>
+              {visited.has("map") && <WorldMap countries={countries} />}
             </div>
           </>
         )}

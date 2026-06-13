@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ComposableMap, Geographies, Geography } from "react-simple-maps";
+import { geoMiller } from "d3-geo-projection";
 import { Search } from "lucide-react";
 import { t } from "../lib/i18n";
 import { countryLabel } from "../lib/countries";
@@ -11,6 +12,14 @@ import { GEO_URL, GEO_ISO3_SET, NO_DATA_COLOR, RAMP_FROM, RAMP_TO, iso3ForGeo, b
 
 const SEARCH_DEBOUNCE_MS = 400;
 const DEFAULT_INDICATOR = describeIndicator(INDICATORS.gdppc.code); // GDP per capita
+
+// Miller cylindrical projection — straight vertical edges (no globe-wrap look).
+// Pre-fitted to an 800×587 viewBox (Miller's natural aspect ≈ 0.733) against the
+// full sphere, so the world fills the box edge-to-edge with no clipping; the SVG
+// then scales to the container width via CSS, preserving that ratio.
+const MAP_W = 800;
+const MAP_H = 587;
+const projection = geoMiller().fitSize([MAP_W, MAP_H], { type: "Sphere" });
 
 export default function WorldMap({ countries }) {
   // Chosen indicator survives tab switches (this panel stays mounted — see App.jsx).
@@ -104,10 +113,9 @@ export default function WorldMap({ countries }) {
                 </div>
               )}
               <ComposableMap
-                projection="geoEqualEarth"
-                projectionConfig={{ scale: 150 }}
-                width={800}
-                height={395}
+                projection={projection}
+                width={MAP_W}
+                height={MAP_H}
                 style={{ width: "100%", height: "auto" }}
                 aria-label={indicator.label}
               >

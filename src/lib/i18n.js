@@ -64,8 +64,9 @@ const messages = {
     "relocate.crit.co2": "CO₂ per capita",
     "relocate.selectHint": "Select at least one criterion to build a ranking.",
     "relocate.zeroWeightHint": "Set at least one criterion to Important or higher.",
+    "relocate.fewCriteriaHint": "Pick 2 or more criteria for a meaningful ranking.",
     "relocate.note":
-      "A simplified livability index: monetary values are log-scaled and outliers are trimmed at the 5th/95th percentile, so the ranking reflects broad quality of life rather than a single stretched axis.",
+      "A simplified livability index: each criterion scores every country by its percentile rank within the filtered set (region and recency), then the scores are combined by your priorities. Ranking sidesteps outliers, so scores spread evenly rather than piling up at the top.",
 
     "quiz.prompt": "Which country's GDP per capita is this?",
     "quiz.axisLabel": "GDP per capita ($)",

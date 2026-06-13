@@ -14,13 +14,22 @@ import { GEO_URL, GEO_ISO3_SET, NO_DATA_COLOR, RAMP_FROM, RAMP_TO, iso3ForGeo, b
 const SEARCH_DEBOUNCE_MS = 400;
 const DEFAULT_INDICATOR = describeIndicator(INDICATORS.gdppc.code); // GDP per capita
 
+// Antarctica (world-atlas numeric id) — dropped from the map: no data here and it
+// wastes a tall empty band at the bottom.
+const ANTARCTICA_ID = "010";
+
 // Miller cylindrical projection — straight vertical edges (no globe-wrap look).
-// Pre-fitted to an 800×587 viewBox (Miller's natural aspect ≈ 0.733) against the
-// full sphere, so the world fills the box edge-to-edge with no clipping; the SVG
-// then scales to the container width via CSS, preserving that ratio.
+// Pre-fitted to the remaining land AFTER dropping Antarctica. The horizontal scale is
+// kept at the full-width sphere value (W / 2π ≈ 127.32), so countries keep their exact
+// size and the map keeps full width; only the box gets shorter. translateY pans the
+// land into the cropped box; MAP_H is its vertical extent (+8px padding top/bottom),
+// derived from the vendored basemap's no-Antarctica land bounds ([[0,8],[800,399]]).
+// The SVG then scales to the container width via CSS, preserving the 800×408 ratio.
 const MAP_W = 800;
-const MAP_H = 587;
-const projection = geoMiller().fitSize([MAP_W, MAP_H], { type: "Sphere" });
+const MAP_H = 408; // was 587 — the freed polar/Antarctic space is removed
+const projection = geoMiller()
+  .scale(MAP_W / (2 * Math.PI))
+  .translate([MAP_W / 2, 260.83]);
 
 export default function WorldMap({ countries, active = false, initialParams = null }) {
   // Chosen indicator survives tab switches (this panel stays mounted — see App.jsx),
@@ -73,6 +82,14 @@ export default function WorldMap({ countries, active = false, initialParams = nu
     let matched = 0;
     for (const code of valueMap.keys()) if (GEO_ISO3_SET.has(code)) matched++;
     return { matched, total: valueMap.size };
+  }, [valueMap]);
+
+  // Highest / Lowest 5 by the indicator's raw value (neutral, no good/bad direction).
+  // Built from the already-fetched map data — no extra request.
+  const topLists = useMemo(() => {
+    const arr = [...valueMap.entries()].map(([code, d]) => ({ code, value: d.value }));
+    arr.sort((a, b) => b.value - a.value);
+    return { highest: arr.slice(0, 5), lowest: arr.slice(-5).reverse() };
   }, [valueMap]);
 
   const ready = rows != null && !loading;
@@ -130,7 +147,9 @@ export default function WorldMap({ countries, active = false, initialParams = nu
               >
                 <Geographies geography={GEO_URL}>
                   {({ geographies }) =>
-                    geographies.map((geo) => {
+                    geographies
+                      .filter((geo) => geo.id !== ANTARCTICA_ID)
+                      .map((geo) => {
                       const code = iso3ForGeo(geo);
                       const datum = code ? valueMap.get(code) : null;
                       const fill = datum ? scale.colorFor(datum.value) : NO_DATA_COLOR;
@@ -180,6 +199,40 @@ export default function WorldMap({ countries, active = false, initialParams = nu
 
         <p className="mt-4 border-t border-slate-100 pt-4 text-xs text-slate-500">{t("map.note")}</p>
       </section>
+
+      {/* Highest / Lowest top-lists — full width below the map; two columns that stack
+          on mobile. Reuse the map's already-fetched values; update with the indicator. */}
+      {ready && topLists.highest.length > 0 && (
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
+            <TopList title={t("map.highest")} rows={topLists.highest} byId={byId} unit={indicator.unit} />
+            <TopList title={t("map.lowest")} rows={topLists.lowest} byId={byId} unit={indicator.unit} />
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+// One ranked list (Highest or Lowest): rank + country name + formatted value.
+function TopList({ title, rows, byId, unit }) {
+  return (
+    <div>
+      <h3 className="text-sm font-medium text-slate-500">{title}</h3>
+      <ol className="mt-3 space-y-2">
+        {rows.map((r, i) => {
+          const country = byId.get(r.code);
+          return (
+            <li key={r.code} className="flex items-baseline justify-between gap-3">
+              <span className="flex min-w-0 items-baseline gap-2">
+                <span className="num w-4 shrink-0 text-right text-xs text-slate-400">{i + 1}</span>
+                <span className="truncate text-sm text-slate-900">{country ? countryLabel(country) : r.code}</span>
+              </span>
+              <span className="num shrink-0 text-sm font-semibold text-slate-900">{formatValue(r.value, unit)}</span>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }

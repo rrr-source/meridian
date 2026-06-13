@@ -7,13 +7,20 @@
     <meta name="description" content="Meridian — an atlas of country development built on World Bank Open Data." />
     <title>Meridian</title>
     <script>
-      // Apply the saved theme BEFORE first paint so a dark reload never flashes light.
+      // Apply the saved theme + language BEFORE first paint so a reload never flashes
+      // the wrong theme or language.
       (function () {
         try {
           var t = localStorage.getItem("meridian-theme");
           document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light");
         } catch (e) {
           document.documentElement.setAttribute("data-theme", "light");
+        }
+        try {
+          var l = localStorage.getItem("meridian-locale");
+          document.documentElement.setAttribute("lang", l === "ru" ? "ru" : "en");
+        } catch (e) {
+          document.documentElement.setAttribute("lang", "en");
         }
       })();
     </script>

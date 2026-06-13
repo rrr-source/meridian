@@ -8,6 +8,7 @@
 
 import { fetchIndicatorCatalog } from "./api";
 import { INDICATOR_LIST } from "./constants";
+import { getLocale } from "./i18n";
 
 let catalogPromise = null; // de-dupes concurrent loads; retried on failure
 const queryCache = new Map(); // normalized query -> descriptor[]
@@ -37,6 +38,14 @@ export function describeIndicator(code, label) {
   const preset = PRESET_BY_CODE.get(code);
   if (preset) return { ...preset, preset: true };
   return { key: code, code, label: label ?? code, unit: null, monetary: false, preset: false };
+}
+
+// Display label for an indicator descriptor in the current locale: a preset's
+// localized `label_<loc>` when present, otherwise its English `label`. Searched
+// (non-preset) indicators have no localized label and stay in catalog English.
+export function indicatorLabel(descriptor) {
+  if (!descriptor) return "";
+  return descriptor[`label_${getLocale()}`] ?? descriptor.label;
 }
 
 // Substring search over the cached catalog. All space-separated terms must match

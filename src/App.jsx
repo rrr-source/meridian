@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Globe, Moon, Sun } from "lucide-react";
-import { t } from "./lib/i18n";
+import { t, SUPPORTED_LOCALES } from "./lib/i18n";
+import { useLocale } from "./lib/LocaleContext.jsx";
 import { fetchCountries } from "./lib/api";
 import { readTab, readSearchParams } from "./lib/urlState";
 import { getInitialTheme, applyTheme } from "./lib/theme";
@@ -31,6 +32,9 @@ export default function App() {
   // Theme is light by default; the index.html inline script already applied any saved
   // choice to <html> before paint, so we just read it back as the initial state.
   const [theme, setTheme] = useState(getInitialTheme);
+  // Locale is reactive via context: switching it re-renders the whole tree so every
+  // t() / countryLabel() / indicatorLabel() re-resolves in the new language.
+  const { locale, setLocale } = useLocale();
 
   const selectTab = (id) => {
     setTab(id);
@@ -60,6 +64,26 @@ export default function App() {
             <p className="text-sm text-slate-400">{t("app.subtitle")}</p>
           </div>
 
+          <div role="group" aria-label={t("lang.label")} className="flex overflow-hidden rounded-md border border-white/15 text-xs font-semibold">
+            {SUPPORTED_LOCALES.map((loc) => {
+              const on = locale === loc;
+              return (
+                <button
+                  key={loc}
+                  type="button"
+                  onClick={() => setLocale(loc)}
+                  aria-pressed={on}
+                  aria-label={t(`lang.${loc}`)}
+                  className={`px-2 py-1 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
+                    on ? "bg-accent text-white" : "text-slate-300 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {loc.toUpperCase()}
+                </button>
+              );
+            })}
+          </div>
+
           <button
             type="button"
             onClick={toggleTheme}
@@ -70,7 +94,7 @@ export default function App() {
             {theme === "dark" ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
           </button>
 
-          <nav aria-label="Modes" className="flex gap-1 rounded-lg bg-white/5 p-1">
+          <nav aria-label={t("nav.modes")} className="flex gap-1 rounded-lg bg-white/5 p-1">
             {TABS.map((tb) => {
               const active = tab === tb.id;
               return (

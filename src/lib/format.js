@@ -1,13 +1,32 @@
-// Number formatters — en-US, compact K/M/B notation for the "instrument panel" readouts.
-const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
-const decimal1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+// Number formatters — compact K/M/B notation for the "instrument panel" readouts,
+// formatted in the CURRENT locale (e.g. ru-RU groups/decimals and uses "тыс./млн/млрд"
+// in compact notation). Formatters are cached per BCP-47 tag. Unit symbols ($, %) and
+// suffixes (yrs, per 1,000, t…) are kept as-is — only the numbers localize.
+
+import { getLocale } from "./i18n";
+
+const LOCALE_TAG = { en: "en-US", ru: "ru-RU" };
+const cache = new Map(); // tag -> { compact, decimal1 }
+
+function formatters() {
+  const tag = LOCALE_TAG[getLocale()] ?? "en-US";
+  let f = cache.get(tag);
+  if (!f) {
+    f = {
+      compact: new Intl.NumberFormat(tag, { notation: "compact", maximumFractionDigits: 1 }),
+      decimal1: new Intl.NumberFormat(tag, { maximumFractionDigits: 1 }),
+    };
+    cache.set(tag, f);
+  }
+  return f;
+}
 
 const isMissing = (v) => v == null || Number.isNaN(v);
 
 // Bare compact number, e.g. 1.3M. Em dash for missing values.
 export function formatCompact(value) {
   if (isMissing(value)) return "—";
-  return compact.format(value);
+  return formatters().compact.format(value);
 }
 
 // Unit-aware formatting for the big readouts, axes and tooltips.
@@ -18,6 +37,7 @@ export function formatCompact(value) {
 // known unit, so we fall back to smart compact (K/M/B) formatting.
 export function formatValue(value, unit) {
   if (isMissing(value)) return "—";
+  const { compact, decimal1 } = formatters();
   if (unit === "$") return `$${compact.format(value)}`;
   if (unit === "%") return `${decimal1.format(value)}%`;
   if (!unit || unit === "ppl") return compact.format(value);
@@ -27,9 +47,10 @@ export function formatValue(value, unit) {
   return `${num} ${unit}`;
 }
 
-// Short axis-tick form (no unit-2: yrs suffix to keep ticks tight).
+// Short axis-tick form (no unit suffix to keep ticks tight).
 export function formatAxis(value, unit) {
   if (isMissing(value)) return "";
+  const { compact } = formatters();
   if (unit === "$") return `$${compact.format(value)}`;
   if (unit === "%") return `${compact.format(value)}%`;
   return compact.format(value);

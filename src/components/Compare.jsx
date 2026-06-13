@@ -6,7 +6,7 @@ import { countryLabel } from "../lib/countries";
 import { fetchSeries } from "../lib/api";
 import { INDICATOR_LIST, DEFAULT_COUNTRIES, MAX_COUNTRIES, START_YEAR, END_YEAR } from "../lib/constants";
 import { addCountry, removeCountry, initCountrySet, colorForSlot, pairKey, normalizeSeriesFor, buildRows, latestFor, logYDomain } from "../lib/compareData";
-import { describeIndicator, searchIndicators } from "../lib/indicators";
+import { describeIndicator, searchIndicators, indicatorLabel } from "../lib/indicators";
 import { decodeCompare, encodeCompare, writeUrl } from "../lib/urlState";
 import { CHART_COLORS } from "../lib/theme";
 import { formatValue, formatAxis } from "../lib/format";
@@ -303,7 +303,7 @@ function CountryBar({ countrySet, countries, selectedCodes, canAdd, labelFor, on
 }
 
 function IndicatorCard({ indicator, scale, chartColors, data, loading, errored, countrySet, labelFor, pickedCodes, onChange, onScaleChange, onRemove }) {
-  const { unit, label } = indicator;
+  const { unit } = indicator;
   const reduced = useReducedMotion();
   const rows = data ?? [];
   const hasData = rows.some((d) => countrySet.some((e) => d[e.code] != null));
@@ -410,7 +410,7 @@ function IndicatorCard({ indicator, scale, chartColors, data, loading, errored, 
       </div>
 
       {/* Screen readers announce the active indicator name (the picker shows it visually). */}
-      <span className="sr-only">{label}</span>
+      <span className="sr-only">{indicatorLabel(indicator)}</span>
     </section>
   );
 }
@@ -491,7 +491,7 @@ function IndicatorPicker({ value, pickedCodes, onChange }) {
           <optgroup label={t("compare.presetGroup")}>
             {INDICATOR_LIST.map((i) => (
               <option key={i.code} value={i.code} disabled={isTaken(i.code)}>
-                {i.label}
+                {indicatorLabel(i)}
                 {isTaken(i.code) ? ` — ${t("compare.picked")}` : ""}
               </option>
             ))}

@@ -6,7 +6,7 @@ import { t } from "../lib/i18n";
 import { countryLabel } from "../lib/countries";
 import { fetchLatestAll } from "../lib/api";
 import { INDICATORS, INDICATOR_LIST } from "../lib/constants";
-import { describeIndicator, searchIndicators } from "../lib/indicators";
+import { describeIndicator, searchIndicators, indicatorLabel } from "../lib/indicators";
 import { decodeMap, encodeMap, writeUrl } from "../lib/urlState";
 import { MAP_COLORS } from "../lib/theme";
 import { formatValue } from "../lib/format";
@@ -145,7 +145,7 @@ export default function WorldMap({ countries, active = false, initialParams = nu
                 width={MAP_W}
                 height={MAP_H}
                 style={{ width: "100%", height: "auto" }}
-                aria-label={indicator.label}
+                aria-label={indicatorLabel(indicator)}
               >
                 <Geographies geography={GEO_URL}>
                   {({ geographies }) =>
@@ -312,7 +312,7 @@ function IndicatorPicker({ value, onChange }) {
           <optgroup label={t("map.presetGroup")}>
             {INDICATOR_LIST.map((i) => (
               <option key={i.code} value={i.code}>
-                {i.label}
+                {indicatorLabel(i)}
               </option>
             ))}
           </optgroup>

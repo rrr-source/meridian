@@ -32,6 +32,9 @@ const messages = {
     "compare.addChart": "Add chart",
     "compare.removeChart": "Remove this chart",
     "compare.picked": "Already charted",
+    "compare.yScale": "Y axis scale",
+    "compare.scaleLinear": "Linear",
+    "compare.scaleLog": "Log",
 
     "relocate.region": "Region",
     "relocate.allRegions": "All regions",

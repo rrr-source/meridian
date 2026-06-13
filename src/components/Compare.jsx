@@ -5,7 +5,7 @@ import { t } from "../lib/i18n";
 import { countryLabel } from "../lib/countries";
 import { fetchSeries } from "../lib/api";
 import { INDICATOR_LIST, DEFAULT_COUNTRIES, MAX_COUNTRIES, START_YEAR, END_YEAR } from "../lib/constants";
-import { addCountry, removeCountry, initCountrySet, colorForSlot, pairKey, normalizeSeriesFor, buildRows, latestFor } from "../lib/compareData";
+import { addCountry, removeCountry, initCountrySet, colorForSlot, pairKey, normalizeSeriesFor, buildRows, latestFor, logYDomain } from "../lib/compareData";
 import { describeIndicator, searchIndicators } from "../lib/indicators";
 import { decodeCompare, encodeCompare, writeUrl } from "../lib/urlState";
 import { formatValue, formatAxis } from "../lib/format";
@@ -14,9 +14,10 @@ import { useReducedMotion } from "../lib/useReducedMotion";
 const SEARCH_DEBOUNCE_MS = 400;
 
 // Stable per-chart id, independent of the chosen indicator (so React keys survive
-// indicator swaps and we can have a chart with no selection mid-edit).
+// indicator swaps and we can have a chart with no selection mid-edit). `scale` is the
+// per-chart y-axis mode: "linear" (default) or "log".
 let nextChartId = 0;
-const makeChart = (indicator) => ({ id: ++nextChartId, indicator });
+const makeChart = (indicator, scale = "linear") => ({ id: ++nextChartId, indicator, scale });
 
 export default function Compare({ countries, active = false, initialParams = null }) {
   // Initial country set + charts come from the URL when Compare was the active tab
@@ -26,7 +27,10 @@ export default function Compare({ countries, active = false, initialParams = nul
   // Shared country set — { code, slot }[] — applies to every chart. Slots give each
   // country a stable palette color across charts and chips (see compareData.js).
   const [countrySet, setCountrySet] = useState(() => initCountrySet(urlInit.codes));
-  const [charts, setCharts] = useState(() => urlInit.charts.map((code) => makeChart(describeIndicator(code))));
+  const [charts, setCharts] = useState(() => {
+    const logSet = new Set(urlInit.logCodes);
+    return urlInit.charts.map((code) => makeChart(describeIndicator(code), logSet.has(code) ? "log" : "linear"));
+  });
   const reconciledRef = useRef(false);
 
   // Series cache, keyed per (indicator, country) PAIR — see compareData.js. Keeping
@@ -48,6 +52,7 @@ export default function Compare({ countries, active = false, initialParams = nul
 
   const codes = useMemo(() => countrySet.map((e) => e.code), [countrySet]);
   const activeIndicatorCodes = useMemo(() => charts.map((c) => c.indicator.code), [charts]);
+  const logCodes = useMemo(() => charts.filter((c) => c.scale === "log").map((c) => c.indicator.code), [charts]);
 
   // Once the country list loads, drop any URL-supplied code that isn't a real
   // country (ISO-3 shape passed at mount, but the live list is the source of truth).
@@ -63,10 +68,11 @@ export default function Compare({ countries, active = false, initialParams = nul
     });
   }, [countries]);
 
-  // While this is the active tab, mirror the country set + chart order into the URL.
+  // While this is the active tab, mirror the country set, chart order, and per-chart
+  // log scales into the URL.
   useEffect(() => {
-    if (active) writeUrl("compare", encodeCompare({ codes, indicatorCodes: activeIndicatorCodes }));
-  }, [active, codes, activeIndicatorCodes]);
+    if (active) writeUrl("compare", encodeCompare({ codes, indicatorCodes: activeIndicatorCodes, logCodes }));
+  }, [active, codes, activeIndicatorCodes, logCodes]);
 
   // Every (indicator, country) pair currently on screen.
   const neededPairs = useMemo(() => {
@@ -170,6 +176,7 @@ export default function Compare({ countries, active = false, initialParams = nul
   // --- Chart actions (unchanged behavior: pick / search / add / remove + dedupe) ---
   const pickedIndicators = useMemo(() => new Set(activeIndicatorCodes), [activeIndicatorCodes]);
   const setIndicator = (id, indicator) => setCharts((prev) => prev.map((c) => (c.id === id ? { ...c, indicator } : c)));
+  const setScale = (id, scale) => setCharts((prev) => prev.map((c) => (c.id === id ? { ...c, scale } : c)));
   const removeChart = (id) => setCharts((prev) => prev.filter((c) => c.id !== id));
   const addChart = () => {
     const free = INDICATOR_LIST.find((i) => !pickedIndicators.has(i.code));
@@ -197,6 +204,7 @@ export default function Compare({ countries, active = false, initialParams = nul
             <IndicatorCard
               key={chart.id}
               indicator={chart.indicator}
+              scale={chart.scale}
               data={rows}
               loading={loading}
               errored={errored}
@@ -204,6 +212,7 @@ export default function Compare({ countries, active = false, initialParams = nul
               labelFor={labelFor}
               pickedCodes={pickedIndicators}
               onChange={(indicator) => setIndicator(chart.id, indicator)}
+              onScaleChange={(scale) => setScale(chart.id, scale)}
               onRemove={charts.length > 1 ? () => removeChart(chart.id) : null}
             />
           );
@@ -290,11 +299,16 @@ function CountryBar({ countrySet, countries, selectedCodes, canAdd, labelFor, on
   );
 }
 
-function IndicatorCard({ indicator, data, loading, errored, countrySet, labelFor, pickedCodes, onChange, onRemove }) {
+function IndicatorCard({ indicator, scale, data, loading, errored, countrySet, labelFor, pickedCodes, onChange, onScaleChange, onRemove }) {
   const { unit, label } = indicator;
   const reduced = useReducedMotion();
   const rows = data ?? [];
   const hasData = rows.some((d) => countrySet.some((e) => d[e.code] != null));
+
+  // Log mode: derive the axis domain from positive values only (log is undefined for
+  // <= 0). If there are no positives, fall back to "auto" so the chart still renders.
+  const isLog = scale === "log";
+  const logDomain = isLog ? logYDomain(rows, countrySet.map((e) => e.code)) : null;
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -328,7 +342,12 @@ function IndicatorCard({ indicator, data, loading, errored, countrySet, labelFor
         ))}
       </div>
 
-      <div className="mt-5 h-60">
+      {/* Per-chart y-axis scale toggle. */}
+      <div className="mt-4 flex justify-end">
+        <ScaleToggle scale={scale} onChange={onScaleChange} />
+      </div>
+
+      <div className="mt-3 h-60">
         {loading ? (
           <Centered>{t("state.loading")}</Centered>
         ) : errored ? (
@@ -352,6 +371,9 @@ function IndicatorCard({ indicator, data, loading, errored, countrySet, labelFor
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(v) => formatAxis(v, unit)}
+                scale={isLog ? "log" : "auto"}
+                domain={isLog ? logDomain ?? ["auto", "auto"] : undefined}
+                allowDataOverflow={isLog || undefined}
               />
               <Tooltip
                 labelFormatter={(y) => String(y)}
@@ -514,6 +536,37 @@ function IndicatorPicker({ value, pickedCodes, onChange }) {
           )}
         </ul>
       )}
+    </div>
+  );
+}
+
+// Compact segmented Linear/Log control for one chart's y-axis.
+function ScaleToggle({ scale, onChange }) {
+  return (
+    <div
+      role="group"
+      aria-label={t("compare.yScale")}
+      className="inline-flex overflow-hidden rounded-md border border-slate-200"
+    >
+      {[
+        ["linear", t("compare.scaleLinear")],
+        ["log", t("compare.scaleLog")],
+      ].map(([value, labelText]) => {
+        const on = scale === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            onClick={() => onChange(value)}
+            aria-pressed={on}
+            className={`border-l border-slate-200 px-2.5 py-1 text-xs font-medium transition-colors first:border-l-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
+              on ? "bg-accent text-white" : "bg-white text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {labelText}
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -75,6 +75,28 @@ export function buildRows(countrySet, cache, indicatorCode) {
   return [...byYear.values()].sort((a, b) => a.year - b.year);
 }
 
+// Y-axis domain for LOG mode: [min, max] over POSITIVE values only — log is undefined
+// for values <= 0, so zeros/negatives are excluded here (and skipped by the scale),
+// letting a series with the odd zero/negative still plot its positive points. Returns
+// null when there are no positive values; a single positive value is padded to a
+// decade so the axis isn't degenerate. `codes` are the active country codes.
+export function logYDomain(rows, codes) {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const row of rows ?? []) {
+    for (const code of codes) {
+      const v = row[code];
+      if (typeof v === "number" && v > 0) {
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+    }
+  }
+  if (min === Infinity) return null;
+  if (min === max) return [min / 2, max * 2];
+  return [min, max];
+}
+
 // Most recent non-null point for a country code in merged recharts rows.
 export function latestFor(data, code) {
   for (let i = data.length - 1; i >= 0; i--) {

@@ -6,7 +6,7 @@
 // dependency — plain URLSearchParams is enough.
 //
 // Param shapes (only the active tab's are present at any time):
-//   ?tab=compare&countries=USA,CHN&charts=gdppc,pop
+//   ?tab=compare&countries=USA,CHN&charts=gdppc,pop&scales=pop
 //   ?tab=relocate&region=Europe%20%26%20Central%20Asia&recency=5&criteria=income:2,safety:1
 //   ?tab=map&indicator=gdppc
 
@@ -80,16 +80,22 @@ const splitList = (raw) =>
 
 // --- Compare --------------------------------------------------------------
 
-export function encodeCompare({ codes, indicatorCodes }) {
+// `logCodes` = the indicator codes whose chart is on a LOG y-axis. They ride in a
+// separate `scales` param (a list of log charts); linear is the default, so absence
+// means linear and existing URLs without it keep working.
+export function encodeCompare({ codes, indicatorCodes, logCodes }) {
   return {
     countries: (codes || []).join(","),
     charts: (indicatorCodes || []).map(encodeIndicatorCode).join(","),
+    scales: (logCodes || []).map(encodeIndicatorCode).join(","),
   };
 }
 
-// Returns { codes: ISO-3[], charts: WB-code[] }. `validCodes` (Set of loaded country
-// ids) is optional: when provided, country codes are validated against it; otherwise
-// only ISO-3 shape is checked (the live list isn't ready yet at first mount).
+// Returns { codes: ISO-3[], charts: WB-code[], logCodes: WB-code[] }. `validCodes`
+// (Set of loaded country ids) is optional: when provided, country codes are validated
+// against it; otherwise only ISO-3 shape is checked (the live list isn't ready yet at
+// first mount). `logCodes` is the subset of `charts` flagged log; anything in `scales`
+// that isn't a current chart (or is malformed) is ignored → that chart stays linear.
 export function decodeCompare(sp, validCodes) {
   let codes = splitList(sp && sp.get("countries")).map((s) => s.toUpperCase()).filter((s) => ISO3.test(s));
   if (validCodes && validCodes.size) codes = codes.filter((c) => validCodes.has(c));
@@ -99,7 +105,12 @@ export function decodeCompare(sp, validCodes) {
   let charts = [...new Set(splitList(sp && sp.get("charts")).map(decodeIndicatorCode).filter(Boolean))];
   if (charts.length === 0) charts = [...DEFAULT_COMPARE_CODES];
 
-  return { codes, charts };
+  const chartSet = new Set(charts);
+  const logCodes = [...new Set(splitList(sp && sp.get("scales")).map(decodeIndicatorCode).filter(Boolean))].filter((c) =>
+    chartSet.has(c)
+  );
+
+  return { codes, charts, logCodes };
 }
 
 // --- Relocate -------------------------------------------------------------

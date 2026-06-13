@@ -30,6 +30,10 @@ npm run build      # outputs to dist/
 npm run preview    # serve the build locally
 ```
 
+On first load a small on-brand splash (the globe mark + a spinner on the dark "ink"
+background) shows instantly while the JS bundle and country list load, then is
+replaced the moment React mounts.
+
 ## The three modes
 
 - **Compare** — build a shared set of up to five countries (chips with stable,
@@ -38,6 +42,9 @@ npm run preview    # serve the build locally
   choose, from a curated list of ~24 presets **or** a live search over the full
   World Bank WDI catalog (~1,486 indicators). The latest value for each country is
   called out above every chart. The same indicator can't be charted twice at once.
+  Each chart has its own **Linear / Log** y-axis toggle (default Linear) — handy when
+  countries of very different magnitude share one chart (e.g. population: USA vs
+  China), so the smaller line isn't squashed flat.
 - **Relocate** — pick the criteria that matter from **13 development indicators**
   (income, unemployment, inflation, healthcare, longevity, infant mortality, safety,
   internet, electricity, clean water, urbanization, literacy, CO₂ per capita) and
@@ -55,6 +62,21 @@ npm run preview    # serve the build locally
   or too small to draw on the basemap — are left gray. Hover any country for a
   tooltip with its name, value, and data year, and read the scale from the min/max
   legend.
+
+## Sharing
+
+The active tab and its settings are encoded in the URL as readable query params, so
+copying the address bar shares the exact view and a reload restores it. Only the
+active tab's settings are in the URL; switching tabs swaps them. For example:
+
+```
+?tab=compare&countries=USA,CHN&charts=gdppc,pop&scales=pop
+?tab=relocate&region=Europe%20%26%20Central%20Asia&recency=5&criteria=income:2,safety:1
+?tab=map&indicator=internet
+```
+
+The URL is treated as untrusted: anything missing, malformed, or unknown falls back
+to a sensible default rather than breaking the view.
 
 ## Data
 
@@ -104,8 +126,6 @@ Europe" is ranked relative to Europe, not the world.
 
 - **World-map year slider** _(deferred)_ — animate the choropleth across time instead
   of showing only the latest value per country.
-- **Shareable URL state** — encode the current selection so a view can be linked.
-- **Linear / log scale toggle for Compare** — switch the Y axis per chart.
 - **Full i18n / localized country names** — the i18n seam and country-name resolver
   are already in place; this fills in additional locales.
 - **Dark mode** — a dark theme for the instrument-panel look.
@@ -113,5 +133,3 @@ Europe" is ranked relative to Europe, not the world.
 ## License
 
 [MIT](LICENSE)
-</content>
-</invoke>

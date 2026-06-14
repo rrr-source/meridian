@@ -30,9 +30,9 @@ npm run build      # outputs to dist/
 npm run preview    # serve the build locally
 ```
 
-On first load a small on-brand splash (the globe mark + a spinner on the dark "ink"
-background) shows instantly while the JS bundle and country list load, then is
-replaced the moment React mounts.
+On first load a small on-brand splash (the globe mark + a spinner, in your saved
+light or dark theme) shows instantly while the JS bundle and country list load, then
+is replaced the moment React mounts.
 
 ## The three modes
 
@@ -78,6 +78,29 @@ active tab's settings are in the URL; switching tabs swaps them. For example:
 The URL is treated as untrusted: anything missing, malformed, or unknown falls back
 to a sensible default rather than breaking the view.
 
+## Localization
+
+Meridian ships in **English and Russian**, switchable live from an **EN / RU toggle in
+the header** (next to the light/dark theme toggle). The choice persists across reloads
+and is applied before first paint, so there's no flash of the wrong language. Switching
+re-renders everything at once: all UI strings, ~217 country names, and the ~24 preset
+indicator labels — and numbers reformat for the locale (e.g. `ru-RU` grouping and
+compact units, `1,2 млн` rather than `1.2M`).
+
+The architecture is built for **N locales, and that extensibility is the point**:
+adding a language is purely data, with no component changes —
+
+1. one more dictionary in [`src/lib/i18n.js`](src/lib/i18n.js) (`messages.<locale>`),
+2. an ISO-3 → name dictionary for [`src/lib/countries.js`](src/lib/countries.js), and
+3. a `label_<locale>` on each preset in [`src/lib/constants.js`](src/lib/constants.js).
+
+`t(key, vars)` reads the current locale and falls back to English (then the key) for
+any missing string, so a partial translation degrades gracefully.
+
+**Known limitation:** the ~1,486 WDI catalog search results stay in English. The World
+Bank catalog is English-only, so searched (non-preset) indicators aren't translated —
+only the curated presets are.
+
 ## Data
 
 All figures come from the **World Bank Open Data API** (`https://api.worldbank.org/v2`)
@@ -96,10 +119,12 @@ The curated presets live in [`src/lib/constants.js`](src/lib/constants.js), grou
 by theme. To add one, append a row to the `INDICATORS` map:
 
 ```js
-gni: { key: "gni", code: "NY.GNP.PCAP.CD", label: "GNI per capita (Atlas)", unit: "$", monetary: true },
+gni: { key: "gni", code: "NY.GNP.PCAP.CD", label: "GNI per capita (Atlas)", label_ru: "ВНД на душу населения (Атлас)", unit: "$", monetary: true },
 ```
 
 - `code` is the World Bank indicator code.
+- `label` is the English name; add `label_ru` (and a `label_<locale>` for any future
+  locale) for the localized preset label — it falls back to `label` if absent.
 - `unit` drives formatting: `"$"`, `"%"`, `"yrs"`, and `"ppl"` are handled
   specially; any other string (e.g. `"per 1,000"`, `"t"`) is rendered as a suffix,
   and an empty/unknown unit falls back to compact `K`/`M`/`B` numbers — which is
@@ -126,9 +151,8 @@ Europe" is ranked relative to Europe, not the world.
 
 - **World-map year slider** _(deferred)_ — animate the choropleth across time instead
   of showing only the latest value per country.
-- **Full i18n / localized country names** — the i18n seam and country-name resolver
-  are already in place; this fills in additional locales.
-- **Dark mode** — a dark theme for the instrument-panel look.
+- **Automated tests** — the pure logic modules (ranking, URL state, formatting,
+  indicator/locale resolvers) are structured for unit testing but aren't covered yet.
 
 ## License
 

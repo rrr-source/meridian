@@ -111,7 +111,7 @@ const messages = {
 
     "nav.modes": "Режимы",
     "tab.compare": "Сравнение",
-    "tab.relocate": "Куда переехать",
+    "tab.relocate": "Релокейт",
     "tab.map": "Карта мира",
 
     "theme.toDark": "Включить тёмную тему",

@@ -17,7 +17,11 @@ export const DEFAULT_TAB = "compare";
 
 const ISO3 = /^[A-Z]{3}$/;
 const CODE = /^[A-Za-z0-9._-]{2,40}$/; // a plausible WB indicator code
-const PRIORITY_LEVELS = [0, 1, 2];
+// Two-level priority: 1 = Important, 2 = Very important. A criterion that isn't
+// wanted is simply absent from the param — there is no "0"/"not important" level.
+// (An old URL's `:0` token has a level outside this set, so it's dropped on decode →
+// the criterion is treated as deselected. See decodeRelocate.)
+const PRIORITY_LEVELS = [1, 2];
 
 // Readable URLs use preset KEYS (gdppc) where possible; searched indicators fall
 // back to their raw WB code (NY.GDP.PCAP.CD). These maps bridge the two.
@@ -116,11 +120,13 @@ export function decodeCompare(sp, validCodes) {
 // --- Relocate -------------------------------------------------------------
 
 // state: { region, recency, selectedKeys: string[], weights: { key: level } }
+// Only SELECTED criteria are encoded, each as `key:level` with level 1 (Important)
+// or 2 (Very important). A deselected criterion is simply absent.
 export function encodeRelocate({ region, recency, selectedKeys, weights }) {
   return {
     region: region && region !== "all" ? region : "",
     recency,
-    criteria: (selectedKeys || []).map((k) => `${k}:${weights[k] ?? 1}`).join(","),
+    criteria: (selectedKeys || []).map((k) => `${k}:${(weights || {})[k] === 2 ? 2 : 1}`).join(","),
   };
 }
 
@@ -135,6 +141,8 @@ export function decodeRelocate(sp, ctx) {
     const i = tok.indexOf(":");
     const key = (i === -1 ? tok : tok.slice(0, i)).trim();
     const level = Number(tok.slice(i + 1));
+    // Drop unknown keys, dupes, and any level outside {1,2}. An old `:0` token lands
+    // here too: 0 isn't a valid level, so the criterion is treated as deselected.
     if (!critSet.has(key) || !PRIORITY_LEVELS.includes(level) || key in weights) continue;
     selected.push(key);
     weights[key] = level;

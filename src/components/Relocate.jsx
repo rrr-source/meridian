@@ -31,10 +31,11 @@ const CRIT_BY_KEY = Object.fromEntries(CRITERIA.map((c) => [c.key, c]));
 // Selected on first load — the original broad index, so existing behavior is recognizable.
 const DEFAULT_SELECTED = ["income", "healthcare", "urban", "internet", "longevity"];
 
-// 3-level priority → weight in the weighted average. "Not important" (0) drops the
-// criterion from the score; the others give Very important twice the pull of Important.
+// Two-level priority → weight in the weighted average. A selected criterion always
+// counts; the control only chooses Important (1) vs Very important (2), the latter
+// pulling twice as hard. To drop a criterion entirely, deselect its chip — there is
+// no "not important" level.
 const PRIORITY_LEVELS = [
-  { value: 0, labelKey: "relocate.priority.not" },
   { value: 1, labelKey: "relocate.priority.important" },
   { value: 2, labelKey: "relocate.priority.very" },
 ];
@@ -190,9 +191,9 @@ export default function Relocate({ countries, active = false, initialParams = nu
     recencyYears == null
       ? t("relocate.recencyCaptionAll")
       : t("relocate.recencyCaption", { n: recencyYears });
-  // Criteria actually pulling on the score (selected AND above "Not important").
-  const activeCount = [...selected].filter((k) => (weights[k] ?? 0) > 0).length;
-  const someWeight = activeCount > 0;
+  // Every selected criterion counts now (weight 1 or 2), so the active count is just
+  // the selection size — it drives the "pick 2+" nudge below.
+  const activeCount = selected.size;
 
   const toggle = (key) => {
     setSelected((prev) => {
@@ -269,19 +270,22 @@ export default function Relocate({ countries, active = false, initialParams = nu
           })}
         </div>
 
-        {/* Per-criterion priority: a compact 3-level segmented control instead of a
-            slider — scales to 13 criteria and drops the false precision of 0–100. */}
+        {/* Per-criterion priority. The criterion name already lives on the chip above,
+            so here we show only a minimal inline label paired with a two-level
+            segmented toggle (Important / Very important). The unselected segment keeps
+            a border, fill, hover and pointer cursor so it reads as a tappable button;
+            the active one is accented and bold. Deselect the chip to drop a criterion. */}
         {selected.size > 0 && (
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <div className="mt-5 grid gap-x-6 gap-y-3 sm:grid-cols-2">
             {CRITERIA.filter((c) => selected.has(c.key)).map((c) => {
               const level = weights[c.key] ?? DEFAULT_PRIORITY;
               return (
-                <div key={c.key}>
-                  <span className="text-sm text-slate-600">{t(c.labelKey)}</span>
+                <div key={c.key} className="flex items-center justify-between gap-3">
+                  <span className="min-w-0 truncate text-sm text-slate-600">{t(c.labelKey)}</span>
                   <div
                     role="group"
                     aria-label={`${t(c.labelKey)} ${t("relocate.priority")}`}
-                    className="mt-1 flex overflow-hidden rounded-md border border-slate-200"
+                    className="flex shrink-0 gap-1"
                   >
                     {PRIORITY_LEVELS.map((p) => {
                       const on = level === p.value;
@@ -291,8 +295,10 @@ export default function Relocate({ countries, active = false, initialParams = nu
                           type="button"
                           onClick={() => setWeight(c.key, p.value)}
                           aria-pressed={on}
-                          className={`flex-1 border-l border-slate-200 px-2 py-1 text-xs font-medium transition-colors first:border-l-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
-                            on ? "bg-accent text-white" : "bg-surface text-slate-600 hover:bg-slate-50"
+                          className={`cursor-pointer rounded-md border px-2.5 py-1 text-xs transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                            on
+                              ? "border-accent bg-accent font-semibold text-white"
+                              : "border-slate-300 bg-slate-50 font-medium text-slate-600 hover:border-slate-400 hover:bg-slate-100"
                           }`}
                         >
                           {t(p.labelKey)}
@@ -328,9 +334,7 @@ export default function Relocate({ countries, active = false, initialParams = nu
         ) : ranking === undefined || loading ? (
           <p className="mt-4 text-sm text-slate-500">{t("state.loading")}</p>
         ) : ranking.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500">
-            {someWeight ? t("relocate.noMatch") : t("relocate.zeroWeightHint")}
-          </p>
+          <p className="mt-4 text-sm text-slate-500">{t("relocate.noMatch")}</p>
         ) : (
           <ol className="mt-4 space-y-3">
             {ranking.slice(0, TOP_N).map((row, i) => {

@@ -64,7 +64,6 @@ const messages = {
     "relocate.noMatch": "No countries match the current region and recency filters.",
     "relocate.criteria": "Criteria",
     "relocate.priority": "priority",
-    "relocate.priority.not": "Not important",
     "relocate.priority.important": "Important",
     "relocate.priority.very": "Very important",
     "relocate.ranking": "Best matches",
@@ -82,7 +81,6 @@ const messages = {
     "relocate.crit.literacy": "Literacy",
     "relocate.crit.co2": "CO₂ per capita",
     "relocate.selectHint": "Select at least one criterion to build a ranking.",
-    "relocate.zeroWeightHint": "Set at least one criterion to Important or higher.",
     "relocate.fewCriteriaHint": "Pick 2 or more criteria for a meaningful ranking.",
     "relocate.note":
       "A simplified livability index: each criterion scores every country by its percentile rank within the filtered set (region and recency), then the scores are combined by your priorities. Ranking sidesteps outliers, so scores spread evenly rather than piling up at the top.",
@@ -156,7 +154,6 @@ const messages = {
     "relocate.noMatch": "Нет стран, подходящих под текущие фильтры по региону и свежести данных.",
     "relocate.criteria": "Критерии",
     "relocate.priority": "приоритет",
-    "relocate.priority.not": "Не важно",
     "relocate.priority.important": "Важно",
     "relocate.priority.very": "Очень важно",
     "relocate.ranking": "Лучшие совпадения",
@@ -174,7 +171,6 @@ const messages = {
     "relocate.crit.literacy": "Грамотность",
     "relocate.crit.co2": "CO₂ на человека",
     "relocate.selectHint": "Выберите хотя бы один критерий, чтобы построить рейтинг.",
-    "relocate.zeroWeightHint": "Задайте хотя бы одному критерию приоритет «Важно» или выше.",
     "relocate.fewCriteriaHint": "Выберите 2 или более критериев для осмысленного рейтинга.",
     "relocate.note":
       "Упрощённый индекс качества жизни: каждый критерий оценивает страну по её процентильному рангу внутри отфильтрованного набора (регион и свежесть данных), затем оценки объединяются по вашим приоритетам. Ранжирование сглаживает выбросы, поэтому оценки распределяются равномерно, а не скапливаются у верхней границы.",

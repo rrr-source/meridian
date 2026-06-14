@@ -45,7 +45,11 @@ export function normalizeIndicator(valueMap, higherIsBetter = true) {
 }
 
 // Country index = Σ(norm_i * weight_i) / Σ(weight_i), over active indicators.
-// activeIndicators: [{ key, higherIsBetter }]; weights: { [key]: number };
+// activeIndicators: [{ key, higherIsBetter }]; weights: { [key]: number }.
+// In the app weights are 1 (Important) or 2 (Very important) — Very important pulls
+// twice as hard — and only selected criteria are passed in (a deselected criterion
+// is omitted, not weighted 0). The math stays general: a non-positive total weight
+// yields [] rather than dividing by zero.
 // valueMaps: { [key]: Map<code, rawValue> }.
 // Only countries with data for ALL selected criteria are ranked. Sorted descending.
 export function computeRanking(activeIndicators, weights, valueMaps) {

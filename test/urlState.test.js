@@ -100,18 +100,31 @@ describe("Compare round-trip + robustness", () => {
 });
 
 describe("Relocate round-trip + robustness", () => {
-  it("round-trips region, recency, and criteria+priorities (incl. level 0)", () => {
+  it("round-trips region, recency, and criteria+priorities (levels 1 and 2)", () => {
     const params = encodeRelocate({
       region: "Europe & Central Asia",
       recency: "10",
       selectedKeys: ["income", "safety"],
-      weights: { income: 2, safety: 0 },
+      weights: { income: 2, safety: 1 },
     });
+    expect(params.criteria).toBe("income:2,safety:1");
     const d = decodeRelocate(new URLSearchParams(params), RELO_CTX);
     expect(d.selected).toEqual(["income", "safety"]);
-    expect(d.weights).toEqual({ income: 2, safety: 0 });
+    expect(d.weights).toEqual({ income: 2, safety: 1 });
     expect(d.recency).toBe("10");
     expect(d.region).toBe("Europe & Central Asia");
+  });
+
+  it("encodes only selected criteria; a missing/odd weight defaults to Important (1)", () => {
+    // income has no weight entry, safety has an out-of-range one → both clamp to 1.
+    const params = encodeRelocate({ region: "all", recency: "5", selectedKeys: ["income", "safety"], weights: { safety: 9 } });
+    expect(params.criteria).toBe("income:1,safety:1");
+  });
+
+  it("treats an old `:0` token as deselected (criterion absent), keeping the rest", () => {
+    const d = decodeRelocate(sp("criteria=income:2,safety:0"), RELO_CTX);
+    expect(d.selected).toEqual(["income"]); // safety:0 dropped, not crashed on
+    expect(d.weights).toEqual({ income: 2 });
   });
 
   it("drops the region param when it is 'all' and restores 'all' on decode", () => {

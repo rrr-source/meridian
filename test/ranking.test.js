@@ -51,8 +51,8 @@ describe("computeRanking — priority-weighted average, sorted descending", () =
   const A = { key: "A", higherIsBetter: true };
   const B = { key: "B", higherIsBetter: true };
 
-  it("combines criteria as a weighted average of their percentile scores", () => {
-    // normA: x0 y50 z100 ; normB: x100 y50 z0 ; weights A=2, B=1
+  it("combines criteria as a weighted average — Very important (2) pulls twice as hard", () => {
+    // normA: x0 y50 z100 ; normB: x100 y50 z0 ; A is Very important (2), B Important (1)
     const valueMaps = { A: m({ x: 10, y: 20, z: 30 }), B: m({ x: 30, y: 20, z: 10 }) };
     const res = computeRanking([A, B], { A: 2, B: 1 }, valueMaps);
     const byCode = Object.fromEntries(res.map((r) => [r.code, r.index]));
@@ -62,15 +62,14 @@ describe("computeRanking — priority-weighted average, sorted descending", () =
     expect(res.map((r) => r.code)).toEqual(["z", "y", "x"]); // sorted descending
   });
 
-  it("a weight of 0 drops that criterion's influence (ranks by the rest)", () => {
+  it("weighs two Important (1) criteria equally — a plain average", () => {
+    // normA: x0 y50 z100 ; normB: x100 y50 z0 ; both Important (1) → equal average
     const valueMaps = { A: m({ x: 10, y: 20, z: 30 }), B: m({ x: 30, y: 20, z: 10 }) };
-    const res = computeRanking([A, B], { A: 1, B: 0 }, valueMaps);
-    // index == normA only: x0 y50 z100
-    expect(res).toEqual([
-      { code: "z", index: 100 },
-      { code: "y", index: 50 },
-      { code: "x", index: 0 },
-    ]);
+    const res = computeRanking([A, B], { A: 1, B: 1 }, valueMaps);
+    const byCode = Object.fromEntries(res.map((r) => [r.code, r.index]));
+    expect(byCode.x).toBe(50);
+    expect(byCode.y).toBe(50);
+    expect(byCode.z).toBe(50);
   });
 
   it("inverts a lower-is-better criterion end to end (unemployment alone)", () => {

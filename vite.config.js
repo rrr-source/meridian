@@ -26,4 +26,10 @@ export default defineConfig({
       },
     },
   },
+  // Unit tests cover the pure logic modules (src/lib) — no DOM needed, so the default
+  // node environment is fine. See test/ for the suites.
+  test: {
+    environment: "node",
+    include: ["test/**/*.test.js"],
+  },
 });

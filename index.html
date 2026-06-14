@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/globe.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Meridian — an atlas of country development built on World Bank Open Data." />
     <title>Meridian</title>
@@ -28,9 +28,11 @@
       Static pre-React splash: shown instantly while the JS bundle downloads, before
       React mounts. It lives inside #root, so createRoot().render() replaces it on the
       first paint — nothing else is needed to remove it. Inline CSS because the app's
-      stylesheet isn't loaded yet at this point. On-brand: ink background, accent-teal
-      globe + spinner, "Meridian" wordmark. Respects the theme set above (light by
-      default; deep ink in dark). prefers-reduced-motion stops the spin.
+      stylesheet isn't loaded yet at this point. On-brand: canvas background, the
+      Meridian mark + accent-teal spinner, "Meridian" wordmark. Respects the theme set
+      above (light by default; deep ink in dark) — the mark's tile uses the accent and
+      its M cut-out uses the splash background, so it reads as a hole in either theme.
+      prefers-reduced-motion stops the spin.
     -->
     <style>
       #app-splash {
@@ -58,8 +60,11 @@
         align-items: center;
         gap: 0.625rem;
       }
-      #app-splash .brand svg {
-        stroke: var(--splash-accent);
+      #app-splash .brand svg .tile {
+        fill: var(--splash-accent);
+      }
+      #app-splash .brand svg .hole {
+        fill: var(--splash-bg);
       }
       #app-splash .wordmark {
         color: var(--splash-fg);
@@ -91,20 +96,12 @@
     <div id="root">
       <div id="app-splash">
         <div class="brand">
-          <svg
-            width="32"
-            height="32"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#0d9488"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
-            <path d="M2 12h20" />
+          <svg width="32" height="32" viewBox="0 0 120 120" aria-hidden="true">
+            <rect class="tile" x="0" y="0" width="120" height="120" rx="28" />
+            <path
+              class="hole"
+              d="M30 88 L30 34 Q30 30 34 33 L60 62 L86 33 Q90 30 90 34 L90 88 L76 88 L76 52 L60 70 L44 52 L44 88 Z"
+            />
           </svg>
           <span class="wordmark">Meridian</span>
         </div>

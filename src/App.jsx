@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Globe, Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { t, SUPPORTED_LOCALES } from "./lib/i18n";
 import { useLocale } from "./lib/LocaleContext.jsx";
 import { fetchCountries } from "./lib/api";
 import { readTab, readSearchParams } from "./lib/urlState";
 import { getInitialTheme, applyTheme } from "./lib/theme";
+import MeridianMark from "./components/MeridianMark";
 import Compare from "./components/Compare";
 import Relocate from "./components/Relocate";
 import WorldMap from "./components/WorldMap";
@@ -58,7 +59,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b border-transparent bg-ink text-white dark:border-slate-800">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-4">
-          <Globe className="h-7 w-7 shrink-0 text-accent" aria-hidden="true" />
+          <MeridianMark size={30} className="shrink-0" />
           <div className="mr-auto">
             <h1 className="text-xl font-semibold leading-tight">{t("app.title")}</h1>
             <p className="text-sm text-slate-400">{t("app.subtitle")}</p>
@@ -163,7 +164,7 @@ export default function App() {
   );
 }
 
-// Centered in-app loader: the accent-teal globe inside a spinning teal ring with a
+// Centered in-app loader: the Meridian mark inside a spinning teal ring with a
 // "Loading…" label — the light-background echo of the static splash in index.html.
 // `animate-spin` is paused by the global prefers-reduced-motion rule in index.css.
 function Loader() {
@@ -174,7 +175,7 @@ function Loader() {
           className="absolute inset-0 animate-spin rounded-full border-[3px] border-accent/20 border-t-accent"
           aria-hidden="true"
         />
-        <Globe className="absolute inset-0 m-auto h-6 w-6 text-accent" aria-hidden="true" />
+        <MeridianMark size={24} className="absolute inset-0 m-auto" />
       </div>
       <span className="text-sm text-slate-500">{t("state.loading")}</span>
     </div>

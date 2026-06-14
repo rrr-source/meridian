@@ -100,6 +100,8 @@ const messages = {
     "map.lowest": "Lowest",
     "map.resetZoom": "Reset zoom",
     "map.pinchHint": "Pinch with two fingers to zoom",
+    "map.fullscreen": "Fullscreen",
+    "map.close": "Close",
     "map.note":
       "Latest available value per country (World Bank, most recent non-empty year). Microstates and a few territories are absent from this low-resolution basemap and show as no data.",
   },
@@ -192,6 +194,8 @@ const messages = {
     "map.lowest": "Минимум",
     "map.resetZoom": "Сбросить масштаб",
     "map.pinchHint": "Сведите двумя пальцами, чтобы приблизить",
+    "map.fullscreen": "Во весь экран",
+    "map.close": "Закрыть",
     "map.note":
       "Последнее доступное значение по каждой стране (Всемирный банк, последний год с данными). Микрогосударства и некоторые территории отсутствуют на этой карте низкого разрешения и показаны как «нет данных».",
   },

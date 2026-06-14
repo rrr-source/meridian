@@ -63,6 +63,11 @@ export default function App() {
             in their own full-width row on mobile (centered) and reflow inline on desktop
             (sm:w-auto) — so toggling language/theme/tabs never shifts the header. */}
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-4">
+          {/* Brand + utility controls share ONE non-wrapping row (flex, no wrap). The
+              title block has min-w-0 + truncate, so it SHRINKS to make room instead of
+              pushing the lang/theme controls onto a new line — at any width, in either
+              language (line-wrapping otherwise uses the title's full content width). */}
+          <div className="flex min-w-0 flex-1 items-center gap-x-4">
           <MeridianMark size={30} className="shrink-0" />
           <div className="mr-auto min-w-0">
             <h1 className="truncate text-xl font-semibold leading-tight">{t("app.title")}</h1>
@@ -98,6 +103,7 @@ export default function App() {
           >
             {theme === "dark" ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
           </button>
+          </div>
 
           {/* Full-width own row on mobile (centered); inline on the right on desktop. */}
           <div className="flex w-full justify-center sm:w-auto">

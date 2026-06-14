@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { geoMiller } from "d3-geo-projection";
-import { Search, Maximize2 } from "lucide-react";
+import { Search, Maximize2, Minimize2, X } from "lucide-react";
 import { t } from "../lib/i18n";
 import { countryLabel } from "../lib/countries";
 import { fetchLatestAll } from "../lib/api";
@@ -54,6 +54,16 @@ function twoFingerOnly(event) {
   return false; // wheel, mousedown, dblclick, etc. → no zoom
 }
 
+// Fullscreen has no page scroll to protect (body is locked), so a single finger may
+// pan and two fingers pinch. Still touch-only — wheel/mouse are rejected.
+function anyTouch(event) {
+  if (!event) return false;
+  if (event.type && event.type.startsWith("touch")) {
+    return !!event.touches && event.touches.length >= 1;
+  }
+  return false;
+}
+
 // Enable zoom only on touch / small screens; keep the desktop map exactly static.
 // Reactive to viewport + input changes via matchMedia. Matches a coarse pointer
 // (phones/tablets) OR a narrow (mobile-breakpoint) viewport.
@@ -80,18 +90,30 @@ export default function WorldMap({ countries, active = false, initialParams = nu
   const [cache, setCache] = useState({}); // indicator code -> mrnev rows
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [tip, setTip] = useState(null); // { name, value, year, x, y }
-  const wrapRef = useRef(null);
 
-  // Touch/mobile only: pinch-zoom + two-finger pan. `view` mirrors ZoomableGroup so we
-  // can offer a reset button; on desktop the map stays static (no ZoomableGroup at all).
+  // Touch/mobile only: pinch-zoom + pan (see MapStage). On desktop the map stays
+  // static. `fullscreen` opens the map in an inset-0 overlay for a much bigger canvas.
   const touchMode = useTouchMode();
-  const [view, setView] = useState(DEFAULT_VIEW);
-  const zoomed = view.zoom > 1.01;
-  const resetZoom = () => {
-    setView(DEFAULT_VIEW);
-    setTip(null);
-  };
+  const [fullscreen, setFullscreen] = useState(false);
+
+  // Lock body scroll while the fullscreen overlay is open; Esc closes it. Both are
+  // fully reverted on close so the page is exactly restored.
+  useEffect(() => {
+    if (!fullscreen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => e.key === "Escape" && setFullscreen(false);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [fullscreen]);
+
+  // A touch user who shrinks to desktop width shouldn't be stuck in the overlay.
+  useEffect(() => {
+    if (!touchMode) setFullscreen(false);
+  }, [touchMode]);
 
   const byId = useMemo(() => new Map(countries.map((c) => [c.id, c])), [countries]);
   const validCodes = useMemo(() => new Set(countries.map((c) => c.id)), [countries]);
@@ -144,6 +166,122 @@ export default function WorldMap({ countries, active = false, initialParams = nu
 
   const ready = rows != null && !loading;
 
+  return (
+    <div className="space-y-6">
+      {/* Indicator picker */}
+      <section className="rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
+        <IndicatorPicker value={indicator} onChange={setIndicator} />
+      </section>
+
+      {/* Map */}
+      <section className="rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
+        {error ? (
+          <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
+            {t("state.error")} {error}
+          </p>
+        ) : (
+          <>
+            {/* Legend */}
+            <LegendRow scale={scale} unit={indicator.unit} ready={ready} noDataColor={mapColors.noData} />
+
+            <MapStage
+              indicator={indicator}
+              valueMap={valueMap}
+              scale={scale}
+              mapColors={mapColors}
+              byId={byId}
+              loading={loading}
+              touchMode={touchMode}
+              onOpenFullscreen={() => setFullscreen(true)}
+            />
+
+            {ready && (
+              <p className="mt-3 text-xs text-slate-500">
+                {t("map.coverage", { matched: coverage.matched, total: coverage.total })}
+              </p>
+            )}
+          </>
+        )}
+
+        <p className="mt-4 border-t border-slate-100 pt-4 text-xs text-slate-500">{t("map.note")}</p>
+      </section>
+
+      {/* Fullscreen overlay (touch only): a much bigger canvas to pinch-zoom and pan.
+          Body scroll is locked while open (see effect above); the X fully restores. */}
+      {fullscreen && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-surface">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+            <LegendRow scale={scale} unit={indicator.unit} ready={ready} noDataColor={mapColors.noData} />
+            <button
+              type="button"
+              onClick={() => setFullscreen(false)}
+              aria-label={t("map.close")}
+              title={t("map.close")}
+              className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md border border-slate-200 bg-surface px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <X size={18} aria-hidden="true" />
+              {t("map.close")}
+            </button>
+          </div>
+          <div className="relative flex-1 p-3">
+            <MapStage
+              fullscreen
+              indicator={indicator}
+              valueMap={valueMap}
+              scale={scale}
+              mapColors={mapColors}
+              byId={byId}
+              loading={loading}
+              touchMode={touchMode}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Highest / Lowest top-lists — full width below the map; two columns that stack
+          on mobile. Reuse the map's already-fetched values; update with the indicator. */}
+      {ready && topLists.highest.length > 0 && (
+        <section className="rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
+          <div className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
+            <TopList title={t("map.highest")} rows={topLists.highest} byId={byId} unit={indicator.unit} />
+            <TopList title={t("map.lowest")} rows={topLists.lowest} byId={byId} unit={indicator.unit} />
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+// Legend + "no data" swatch row. Shared by the inline panel and the fullscreen header.
+function LegendRow({ scale, unit, ready, noDataColor }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+      <Legend min={scale.min} max={scale.max} unit={unit} ready={ready} />
+      <span className="inline-flex items-center gap-2 text-xs text-slate-500">
+        <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: noDataColor }} aria-hidden="true" />
+        {t("map.noData")}
+      </span>
+    </div>
+  );
+}
+
+// The interactive map canvas: choropleth + (touch) pinch-zoom/pan + tap-to-tooltip.
+// Used twice — inline (tall on mobile, static 2:1 on desktop) and inside the
+// fullscreen overlay — each with its own independent zoom/tooltip state.
+//   - filled (touch): the SVG fills a taller box and slice-crops so countries are
+//     noticeably bigger; desktop keeps the natural 2:1 "meet" letterbox, unchanged.
+//   - inline touch uses twoFingerOnly + touch-action pan-y so one-finger swipes still
+//     scroll the page; fullscreen has no page scroll to protect, so one finger pans.
+function MapStage({ indicator, valueMap, scale, mapColors, byId, loading, touchMode, fullscreen = false, onOpenFullscreen }) {
+  const [view, setView] = useState(DEFAULT_VIEW);
+  const [tip, setTip] = useState(null); // { name, value, year, x, y }
+  const wrapRef = useRef(null);
+  const zoomed = view.zoom > 1.01;
+  const resetZoom = () => {
+    setView(DEFAULT_VIEW);
+    setTip(null);
+  };
+
   const showTip = (geo, e) => {
     const code = iso3ForGeo(geo);
     const datum = code ? valueMap.get(code) : null;
@@ -158,8 +296,8 @@ export default function WorldMap({ countries, active = false, initialParams = nu
     });
   };
 
-  // The drawn countries. Identical whether rendered directly (desktop, static) or
-  // inside ZoomableGroup (touch) — so zoom never changes fills, taps, or tooltips.
+  // Identical whether rendered directly (desktop) or inside ZoomableGroup (touch) —
+  // so zoom never changes fills, taps, or tooltips.
   const mapGeographies = (
     <Geographies geography={GEO_URL}>
       {({ geographies }) =>
@@ -191,120 +329,102 @@ export default function WorldMap({ countries, active = false, initialParams = nu
     </Geographies>
   );
 
+  const filled = touchMode; // taller, slice-cropped fill on touch (inline + fullscreen)
+  const svgStyle = filled ? { width: "100%", height: "100%" } : { width: "100%", height: "auto" };
+  const preserve = filled ? "xMidYMid slice" : "xMidYMid meet";
+  const wrapClass = fullscreen
+    ? "relative h-full w-full"
+    : touchMode
+      ? "relative mt-4 h-[60vh] min-h-[20rem] max-h-[34rem]"
+      : "relative mt-4";
+
   return (
-    <div className="space-y-6">
-      {/* Indicator picker */}
-      <section className="rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
-        <IndicatorPicker value={indicator} onChange={setIndicator} />
-      </section>
-
-      {/* Map */}
-      <section className="rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
-        {error ? (
-          <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300">
-            {t("state.error")} {error}
-          </p>
-        ) : (
-          <>
-            {/* Legend */}
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-              <Legend min={scale.min} max={scale.max} unit={indicator.unit} ready={ready} />
-              <span className="inline-flex items-center gap-2 text-xs text-slate-500">
-                <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: mapColors.noData }} aria-hidden="true" />
-                {t("map.noData")}
-              </span>
-            </div>
-
-            {/* touchAction: "pan-y" (touch mode only) lets the browser keep one-finger
-                vertical page scrolling while two-finger gestures reach the map's
-                d3-zoom — see twoFingerOnly. Desktop gets no touch-action override. */}
-            <div
-              ref={wrapRef}
-              className="relative mt-4"
-              style={touchMode ? { touchAction: "pan-y" } : undefined}
+    <>
+      <div
+        ref={wrapRef}
+        className={wrapClass}
+        style={touchMode ? { touchAction: fullscreen ? "none" : "pan-y" } : undefined}
+      >
+        {loading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface/70 text-sm text-slate-500">
+            {t("state.loading")}
+          </div>
+        )}
+        <ComposableMap
+          projection={projection}
+          width={MAP_W}
+          height={MAP_H}
+          preserveAspectRatio={preserve}
+          style={svgStyle}
+          aria-label={indicatorLabel(indicator)}
+        >
+          {touchMode ? (
+            <ZoomableGroup
+              center={view.center}
+              zoom={view.zoom}
+              minZoom={MIN_ZOOM}
+              maxZoom={MAX_ZOOM}
+              translateExtent={[[0, 0], [MAP_W, MAP_H]]}
+              filterZoomEvent={fullscreen ? anyTouch : twoFingerOnly}
+              onMoveEnd={({ coordinates, zoom }) => setView({ center: coordinates, zoom })}
             >
-              {loading && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface/70 text-sm text-slate-500">
-                  {t("state.loading")}
-                </div>
-              )}
-              <ComposableMap
-                projection={projection}
-                width={MAP_W}
-                height={MAP_H}
-                style={{ width: "100%", height: "auto" }}
-                aria-label={indicatorLabel(indicator)}
+              {mapGeographies}
+            </ZoomableGroup>
+          ) : (
+            mapGeographies
+          )}
+        </ComposableMap>
+
+        {/* Controls (touch only). Reset appears once zoomed; the fullscreen button is
+            inline-only and is kept SEPARATE from country taps (it sits above the map). */}
+        {touchMode && (
+          <div className="absolute right-2 top-2 z-20 flex gap-2">
+            {zoomed && (
+              <button
+                type="button"
+                onClick={resetZoom}
+                aria-label={t("map.resetZoom")}
+                title={t("map.resetZoom")}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-slate-200 bg-surface/95 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm backdrop-blur focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
-                {touchMode ? (
-                  <ZoomableGroup
-                    center={view.center}
-                    zoom={view.zoom}
-                    minZoom={MIN_ZOOM}
-                    maxZoom={MAX_ZOOM}
-                    translateExtent={[[0, 0], [MAP_W, MAP_H]]}
-                    filterZoomEvent={twoFingerOnly}
-                    onMoveEnd={({ coordinates, zoom }) => setView({ center: coordinates, zoom })}
-                  >
-                    {mapGeographies}
-                  </ZoomableGroup>
-                ) : (
-                  mapGeographies
-                )}
-              </ComposableMap>
-
-              {/* Reset-zoom control: touch only, shown once zoomed/panned in. */}
-              {touchMode && zoomed && (
-                <button
-                  type="button"
-                  onClick={resetZoom}
-                  className="absolute right-2 top-2 z-20 inline-flex min-h-11 items-center gap-1.5 rounded-md border border-slate-200 bg-surface/95 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm backdrop-blur focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  <Maximize2 size={14} aria-hidden="true" />
-                  {t("map.resetZoom")}
-                </button>
-              )}
-
-              {tip && (
-                <div
-                  className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-md border border-slate-200 bg-surface px-2.5 py-1.5 text-xs shadow-md"
-                  style={{ left: tip.x, top: tip.y - 8 }}
-                >
-                  <div className="font-medium text-slate-900">{tip.name}</div>
-                  <div className="num text-slate-600">
-                    {tip.value}
-                    {tip.year != null && <span className="ml-1.5 text-slate-400">{tip.year}</span>}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Touch-only discoverability hint for the pinch gesture. */}
-            {touchMode && !zoomed && (
-              <p className="mt-3 text-xs text-slate-400">{t("map.pinchHint")}</p>
+                <Minimize2 size={14} aria-hidden="true" />
+                {t("map.resetZoom")}
+              </button>
             )}
-
-            {ready && (
-              <p className="mt-3 text-xs text-slate-500">
-                {t("map.coverage", { matched: coverage.matched, total: coverage.total })}
-              </p>
+            {!fullscreen && onOpenFullscreen && (
+              <button
+                type="button"
+                onClick={onOpenFullscreen}
+                aria-label={t("map.fullscreen")}
+                title={t("map.fullscreen")}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-slate-200 bg-surface/95 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm backdrop-blur focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                <Maximize2 size={14} aria-hidden="true" />
+                {t("map.fullscreen")}
+              </button>
             )}
-          </>
+          </div>
         )}
 
-        <p className="mt-4 border-t border-slate-100 pt-4 text-xs text-slate-500">{t("map.note")}</p>
-      </section>
-
-      {/* Highest / Lowest top-lists — full width below the map; two columns that stack
-          on mobile. Reuse the map's already-fetched values; update with the indicator. */}
-      {ready && topLists.highest.length > 0 && (
-        <section className="rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
-          <div className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
-            <TopList title={t("map.highest")} rows={topLists.highest} byId={byId} unit={indicator.unit} />
-            <TopList title={t("map.lowest")} rows={topLists.lowest} byId={byId} unit={indicator.unit} />
+        {tip && (
+          <div
+            className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-md border border-slate-200 bg-surface px-2.5 py-1.5 text-xs shadow-md"
+            style={{ left: tip.x, top: tip.y - 8 }}
+          >
+            <div className="font-medium text-slate-900">{tip.name}</div>
+            <div className="num text-slate-600">
+              {tip.value}
+              {tip.year != null && <span className="ml-1.5 text-slate-400">{tip.year}</span>}
+            </div>
           </div>
-        </section>
+        )}
+      </div>
+
+      {/* Touch-only discoverability hint for the pinch gesture (inline only). */}
+      {touchMode && !fullscreen && !zoomed && (
+        <p className="mt-3 text-xs text-slate-400">{t("map.pinchHint")}</p>
       )}
-    </div>
+    </>
   );
 }
 

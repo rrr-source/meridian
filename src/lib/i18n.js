@@ -131,7 +131,7 @@ const messages = {
     "compare.indicator": "Показатель",
     "compare.presetGroup": "Готовые показатели",
     "compare.customOption": "Найдено: {label}",
-    "compare.searchPlaceholder": "Поиск по каталогу Всемирного банка…",
+    "compare.searchPlaceholder": "Поиск по каталогу",
     "compare.searchLabel": "Поиск показателей",
     "compare.searching": "Поиск…",
     "compare.noResults": "Ничего не найдено.",
@@ -176,7 +176,7 @@ const messages = {
       "Упрощённый индекс качества жизни: каждый критерий оценивает страну по её процентильному рангу внутри отфильтрованного набора (регион и свежесть данных), затем оценки объединяются по вашим приоритетам. Ранжирование сглаживает выбросы, поэтому оценки распределяются равномерно, а не скапливаются у верхней границы.",
 
     "map.indicator": "Показатель",
-    "map.searchPlaceholder": "Поиск по каталогу Всемирного банка…",
+    "map.searchPlaceholder": "Поиск по каталогу",
     "map.searchLabel": "Поиск показателей",
     "map.searching": "Поиск…",
     "map.noResults": "Ничего не найдено.",

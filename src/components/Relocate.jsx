@@ -260,7 +260,7 @@ export default function Relocate({ countries, active = false, initialParams = nu
                 aria-pressed={active}
                 className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                   active
-                    ? "border-accent bg-accent text-white"
+                    ? "border-accent bg-accent/15 text-accent dark:bg-accent/25"
                     : "border-slate-200 bg-surface text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                 }`}
               >

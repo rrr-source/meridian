@@ -217,7 +217,7 @@ export default function Relocate({ countries, active = false, initialParams = nu
             <select
               value={region}
               onChange={(e) => setRegion(e.target.value)}
-              className="ml-auto min-w-0 max-w-full rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="ml-auto min-h-11 min-w-0 max-w-full rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-900 sm:min-h-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <option value="all">{t("relocate.allRegions")}</option>
               {regions.map((r) => (
@@ -233,7 +233,7 @@ export default function Relocate({ countries, active = false, initialParams = nu
             <select
               value={recency}
               onChange={(e) => setRecency(e.target.value)}
-              className="ml-auto min-w-0 max-w-full rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="ml-auto min-h-11 min-w-0 max-w-full rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-900 sm:min-h-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               {RECENCY_OPTIONS.map((o) => (
                 <option key={o.key} value={o.key}>
@@ -258,7 +258,7 @@ export default function Relocate({ countries, active = false, initialParams = nu
                 type="button"
                 onClick={() => toggle(c.key)}
                 aria-pressed={active}
-                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                className={`inline-flex min-h-11 items-center justify-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors sm:min-h-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                   active
                     ? "border-accent bg-accent/15 text-accent dark:bg-accent/25"
                     : "border-slate-200 bg-surface text-slate-600 hover:border-slate-300 hover:bg-slate-50"

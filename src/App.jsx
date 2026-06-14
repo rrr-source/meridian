@@ -58,14 +58,18 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b border-transparent bg-ink text-white dark:border-slate-800">
+        {/* Stable layout: the brand title truncates and the lang/theme controls are
+            fixed-width, so the top row never changes height between EN/RU. The tabs sit
+            in their own full-width row on mobile (centered) and reflow inline on desktop
+            (sm:w-auto) — so toggling language/theme/tabs never shifts the header. */}
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-4">
           <MeridianMark size={30} className="shrink-0" />
-          <div className="mr-auto">
-            <h1 className="text-xl font-semibold leading-tight">{t("app.title")}</h1>
-            <p className="text-sm text-slate-400">{t("app.subtitle")}</p>
+          <div className="mr-auto min-w-0">
+            <h1 className="truncate text-xl font-semibold leading-tight">{t("app.title")}</h1>
+            <p className="truncate text-sm text-slate-400">{t("app.subtitle")}</p>
           </div>
 
-          <div role="group" aria-label={t("lang.label")} className="flex overflow-hidden rounded-md border border-white/15 text-xs font-semibold">
+          <div role="group" aria-label={t("lang.label")} className="flex shrink-0 overflow-hidden rounded-md border border-white/15 text-xs font-semibold">
             {SUPPORTED_LOCALES.map((loc) => {
               const on = locale === loc;
               return (
@@ -90,29 +94,32 @@ export default function App() {
             onClick={toggleTheme}
             aria-label={theme === "dark" ? t("theme.toLight") : t("theme.toDark")}
             title={theme === "dark" ? t("theme.toLight") : t("theme.toDark")}
-            className="rounded-md p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="shrink-0 rounded-md p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             {theme === "dark" ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
           </button>
 
-          <nav aria-label={t("nav.modes")} className="flex gap-1 rounded-lg bg-white/5 p-1">
-            {TABS.map((tb) => {
-              const active = tab === tb.id;
-              return (
-                <button
-                  key={tb.id}
-                  type="button"
-                  onClick={() => selectTab(tb.id)}
-                  aria-current={active ? "page" : undefined}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                    active ? "bg-accent text-white" : "text-slate-300 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  {t(tb.labelKey)}
-                </button>
-              );
-            })}
-          </nav>
+          {/* Full-width own row on mobile (centered); inline on the right on desktop. */}
+          <div className="flex w-full justify-center sm:w-auto">
+            <nav aria-label={t("nav.modes")} className="flex flex-wrap justify-center gap-1 rounded-lg bg-white/5 p-1">
+              {TABS.map((tb) => {
+                const active = tab === tb.id;
+                return (
+                  <button
+                    key={tb.id}
+                    type="button"
+                    onClick={() => selectTab(tb.id)}
+                    aria-current={active ? "page" : undefined}
+                    className={`inline-flex min-h-11 items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors sm:min-h-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                      active ? "bg-accent text-white" : "text-slate-300 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    {t(tb.labelKey)}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
         </div>
       </header>
 

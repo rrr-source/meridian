@@ -226,7 +226,7 @@ export default function Compare({ countries, active = false, initialParams = nul
         type="button"
         onClick={addChart}
         disabled={!canAddChart}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-surface px-4 py-3 text-sm font-medium text-slate-600 transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-surface px-4 py-3 text-sm font-medium text-slate-600 transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <Plus size={16} aria-hidden="true" />
         {t("compare.addChart")}
@@ -282,7 +282,7 @@ function CountryBar({ countrySet, countries, selectedCodes, canAdd, labelFor, on
                 if (e.target.value) onAdd(e.target.value);
               }}
               aria-label={t("compare.addCountry")}
-              className="rounded-full border border-dashed border-slate-300 bg-surface py-1.5 pl-3 pr-2 text-sm font-medium text-slate-600 hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="min-h-11 rounded-full border border-dashed border-slate-300 bg-surface py-1.5 pl-3 pr-2 text-sm font-medium text-slate-600 hover:border-accent hover:text-accent sm:min-h-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <option value="">+ {t("compare.addCountry")}</option>
               {available.map((c) => (
@@ -314,7 +314,11 @@ function IndicatorCard({ indicator, scale, chartColors, data, loading, errored, 
   const logDomain = isLog ? logYDomain(rows, countrySet.map((e) => e.code)) : null;
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
+    // min-w-0: as a grid item this card must be allowed to shrink below its content
+    // width, otherwise recharts' ResponsiveContainer keeps it wider than the phone
+    // viewport and the chart spills past the right edge. p-4 on mobile gives the plot
+    // a little more room; p-5 on desktop is unchanged.
+    <section className="min-w-0 rounded-xl border border-slate-200 bg-surface p-4 shadow-sm sm:p-5">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <IndicatorPicker value={indicator} pickedCodes={pickedCodes} onChange={onChange} />
@@ -486,7 +490,7 @@ function IndicatorPicker({ value, pickedCodes, onChange }) {
           aria-label={t("compare.indicator")}
           value={selectValue}
           onChange={(e) => choose(describeIndicator(e.target.value))}
-          className="min-w-0 flex-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-sm font-medium text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="min-h-11 min-w-0 flex-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-sm font-medium text-slate-900 sm:min-h-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <optgroup label={t("compare.presetGroup")}>
             {INDICATOR_LIST.map((i) => (

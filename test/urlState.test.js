@@ -31,14 +31,15 @@ const RELO_CTX = {
 
 describe("readTab", () => {
   it("returns the named tab when valid", () => {
+    expect(readTab("?tab=compare")).toBe("compare");
     expect(readTab("?tab=relocate")).toBe("relocate");
     expect(readTab("?tab=map")).toBe("map");
   });
-  it("falls back to the default tab for unknown/missing", () => {
-    expect(readTab("?tab=bogus")).toBe("compare");
-    expect(readTab("")).toBe("compare");
-    expect(readTab(null)).toBe("compare");
-    expect(readTab(undefined)).toBe("compare");
+  it("falls back to the default tab (map) for unknown/missing", () => {
+    expect(readTab("?tab=bogus")).toBe("map");
+    expect(readTab("")).toBe("map");
+    expect(readTab(null)).toBe("map");
+    expect(readTab(undefined)).toBe("map");
   });
 });
 

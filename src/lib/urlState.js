@@ -13,7 +13,7 @@
 import { INDICATORS, INDICATOR_LIST, DEFAULT_COUNTRIES, DEFAULT_COMPARE, MAX_COUNTRIES } from "./constants";
 
 export const VALID_TABS = ["compare", "relocate", "map"];
-export const DEFAULT_TAB = "compare";
+export const DEFAULT_TAB = "map";
 
 const ISO3 = /^[A-Z]{3}$/;
 const CODE = /^[A-Za-z0-9._-]{2,40}$/; // a plausible WB indicator code

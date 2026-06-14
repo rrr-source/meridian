@@ -11,9 +11,9 @@ import Relocate from "./components/Relocate";
 import WorldMap from "./components/WorldMap";
 
 const TABS = [
+  { id: "map", labelKey: "tab.map" },
   { id: "compare", labelKey: "tab.compare" },
   { id: "relocate", labelKey: "tab.relocate" },
-  { id: "map", labelKey: "tab.map" },
 ];
 
 export default function App() {

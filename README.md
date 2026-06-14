@@ -34,6 +34,18 @@ On first load a small on-brand splash (the globe mark + a spinner, in your saved
 light or dark theme) shows instantly while the JS bundle and country list load, then
 is replaced the moment React mounts.
 
+## Tests
+
+The pure logic modules have a [Vitest](https://vitest.dev/) unit-test suite — **69
+tests** covering the ranking math, URL-state encode/decode (including hostile-input
+robustness), number/unit formatting per locale, the country/region/indicator
+resolvers, and the Compare data merge + log-domain helper.
+
+```bash
+npm test            # run the suite once
+npm run test:watch  # watch mode
+```
+
 ## The three modes
 
 - **Compare** — build a shared set of up to five countries (chips with stable,
@@ -147,10 +159,16 @@ _Not important_ drops the criterion entirely). Scoring by percentile is naturall
 robust to outliers and is recomputed whenever the filters change — so "best in
 Europe" is ranked relative to Europe, not the world.
 
-## Roadmap
+## Possible future directions
 
-- **Automated tests** — the pure logic modules (ranking, URL state, formatting,
-  indicator/locale resolvers) are structured for unit testing but aren't covered yet.
+Everything on the original roadmap has shipped. A few optional ideas — not planned or
+promised, just directions someone could take this:
+
+- An accessibility / mobile-polish pass.
+- A custom themed dropdown to replace the native `<select>`, so option lists fully
+  pick up the theme and localization.
+- Optional pan / zoom on the World map for reading small countries.
+- A CI workflow to run the test suite on every push.
 
 ## License
 

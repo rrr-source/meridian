@@ -8,6 +8,12 @@ import { getLocale } from "./i18n";
 const LOCALE_TAG = { en: "en-US", ru: "ru-RU" };
 const cache = new Map(); // tag -> { compact, decimal1 }
 
+// Localized text for the word-unit suffixes ($ and % are symbols, kept as-is).
+const UNIT_LABELS = {
+  ru: { "per 1,000": "на 1000", "per 100": "на 100" },
+};
+const unitLabel = (unit) => UNIT_LABELS[getLocale()]?.[unit] ?? unit;
+
 function formatters() {
   const tag = LOCALE_TAG[getLocale()] ?? "en-US";
   let f = cache.get(tag);
@@ -44,7 +50,7 @@ export function formatValue(value, unit) {
   // Any other known unit (yrs, per 1,000, per 100, t…): small magnitudes read
   // better as plain decimals; large ones still get compact notation. Suffix the unit.
   const num = Math.abs(value) >= 10000 ? compact.format(value) : decimal1.format(value);
-  return `${num} ${unit}`;
+  return `${num} ${unitLabel(unit)}`;
 }
 
 // Short axis-tick form (no unit suffix to keep ticks tight).

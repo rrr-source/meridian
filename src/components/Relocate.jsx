@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../lib/i18n";
-import { countryLabel } from "../lib/countries";
+import { countryLabel, regionLabel } from "../lib/countries";
 import { fetchLatestAll } from "../lib/api";
 import { END_YEAR } from "../lib/constants";
 import { computeRanking } from "../lib/ranking";
@@ -221,7 +221,7 @@ export default function Relocate({ countries, active = false, initialParams = nu
               <option value="all">{t("relocate.allRegions")}</option>
               {regions.map((r) => (
                 <option key={r} value={r}>
-                  {r}
+                  {regionLabel(r)}
                 </option>
               ))}
             </select>

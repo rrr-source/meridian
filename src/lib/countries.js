@@ -13,3 +13,25 @@ export const countryLabel = (country, locale = getLocale()) => {
   const dict = DICTS[locale];
   return (dict && dict[country.id]) || country.name;
 };
+
+// WB region names → Russian. Display-only: the English region string stays the
+// internal filter value and URL token; we just localize what's shown. Keys are
+// trimmed (the API returns a couple with a trailing space — see regionLabel).
+const REGION_NAMES_RU = {
+  "East Asia & Pacific": "Восточная Азия и Тихоокеанский регион",
+  "Europe & Central Asia": "Европа и Центральная Азия",
+  "Latin America & Caribbean": "Латинская Америка и Карибский бассейн",
+  "Middle East, North Africa, Afghanistan & Pakistan": "Ближний Восток, Северная Африка, Афганистан и Пакистан",
+  "North America": "Северная Америка",
+  "South Asia": "Южная Азия",
+  "Sub-Saharan Africa": "Африка южнее Сахары",
+};
+
+const REGION_DICTS = { ru: REGION_NAMES_RU };
+
+// Display label for a WB region value, falling back to the raw English string.
+export const regionLabel = (region, locale = getLocale()) => {
+  if (!region) return "";
+  const dict = REGION_DICTS[locale];
+  return (dict && dict[region.trim()]) || region;
+};

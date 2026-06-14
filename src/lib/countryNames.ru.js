@@ -4,8 +4,8 @@
 //
 // A few entries use common short forms over official long ones (noted): KGZ
 // "Киргизия" (not "Кыргызстан"), KOR "Республика Корея", PRK "КНДР", ZAF "ЮАР",
-// CHI "Нормандские острова", PSE "Палестина", TLS "Восточный Тимор". Spot-check these
-// against your house style if needed.
+// CHI "Нормандские острова", PSE "Палестинские территории", TLS "Восточный Тимор".
+// Spot-check these against your house style if needed.
 export const COUNTRY_NAMES_RU = {
   ABW: "Аруба",
   AFG: "Афганистан",
@@ -168,7 +168,7 @@ export const COUNTRY_NAMES_RU = {
   PRK: "КНДР",
   PRT: "Португалия",
   PRY: "Парагвай",
-  PSE: "Палестина",
+  PSE: "Палестинские территории",
   PYF: "Французская Полинезия",
   QAT: "Катар",
   ROU: "Румыния",

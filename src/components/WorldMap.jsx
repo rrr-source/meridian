@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ComposableMap, Geographies, Geography } from "react-simple-maps";
+import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { geoMiller } from "d3-geo-projection";
-import { Search } from "lucide-react";
+import { Search, Maximize2 } from "lucide-react";
 import { t } from "../lib/i18n";
 import { countryLabel } from "../lib/countries";
 import { fetchLatestAll } from "../lib/api";
@@ -32,6 +32,44 @@ const projection = geoMiller()
   .scale(MAP_W / (2 * Math.PI))
   .translate([MAP_W / 2, 260.83]);
 
+// Touch-only zoom limits. min 1× = the full world (can't zoom out past it); max 8×
+// lets a phone user reach tiny countries. The default, reset view.
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 8;
+const DEFAULT_VIEW = { center: [0, 0], zoom: 1 };
+
+// d3-zoom event filter (passed to ZoomableGroup.filterZoomEvent). It runs BEFORE
+// d3-zoom calls preventDefault, so anything we reject is left entirely to the browser.
+//   - Only a TWO-finger touch starts a zoom/pan gesture (event.touches.length >= 2).
+//     A one-finger touch is rejected → not prevented → the page scrolls normally.
+//   - Wheel and mouse drags are rejected, so there is no desktop-style wheel/drag zoom
+//     even on a touch laptop; the gesture is exclusively two-finger touch.
+// (d3-zoom's touchstarted reads event.touches — all active touches — so when the 2nd
+// finger lands the gesture starts with BOTH points registered, i.e. a real pinch.)
+function twoFingerOnly(event) {
+  if (!event) return false;
+  if (event.type && event.type.startsWith("touch")) {
+    return !!event.touches && event.touches.length >= 2;
+  }
+  return false; // wheel, mousedown, dblclick, etc. → no zoom
+}
+
+// Enable zoom only on touch / small screens; keep the desktop map exactly static.
+// Reactive to viewport + input changes via matchMedia. Matches a coarse pointer
+// (phones/tablets) OR a narrow (mobile-breakpoint) viewport.
+function useTouchMode() {
+  const [touch, setTouch] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(pointer: coarse), (max-width: 639px)");
+    const update = () => setTouch(mq.matches);
+    update();
+    mq.addEventListener?.("change", update);
+    return () => mq.removeEventListener?.("change", update);
+  }, []);
+  return touch;
+}
+
 export default function WorldMap({ countries, active = false, initialParams = null, theme = "light" }) {
   const mapColors = MAP_COLORS[theme] ?? MAP_COLORS.light;
   // Chosen indicator survives tab switches (this panel stays mounted — see App.jsx),
@@ -44,6 +82,16 @@ export default function WorldMap({ countries, active = false, initialParams = nu
   const [error, setError] = useState(null);
   const [tip, setTip] = useState(null); // { name, value, year, x, y }
   const wrapRef = useRef(null);
+
+  // Touch/mobile only: pinch-zoom + two-finger pan. `view` mirrors ZoomableGroup so we
+  // can offer a reset button; on desktop the map stays static (no ZoomableGroup at all).
+  const touchMode = useTouchMode();
+  const [view, setView] = useState(DEFAULT_VIEW);
+  const zoomed = view.zoom > 1.01;
+  const resetZoom = () => {
+    setView(DEFAULT_VIEW);
+    setTip(null);
+  };
 
   const byId = useMemo(() => new Map(countries.map((c) => [c.id, c])), [countries]);
   const validCodes = useMemo(() => new Set(countries.map((c) => c.id)), [countries]);
@@ -110,6 +158,39 @@ export default function WorldMap({ countries, active = false, initialParams = nu
     });
   };
 
+  // The drawn countries. Identical whether rendered directly (desktop, static) or
+  // inside ZoomableGroup (touch) — so zoom never changes fills, taps, or tooltips.
+  const mapGeographies = (
+    <Geographies geography={GEO_URL}>
+      {({ geographies }) =>
+        geographies
+          .filter((geo) => geo.id !== ANTARCTICA_ID)
+          .map((geo) => {
+            const code = iso3ForGeo(geo);
+            const datum = code ? valueMap.get(code) : null;
+            const fill = datum ? scale.colorFor(datum.value) : mapColors.noData;
+            return (
+              <Geography
+                key={geo.rsmKey}
+                geography={geo}
+                fill={fill}
+                stroke={mapColors.border}
+                strokeWidth={0.4}
+                onMouseEnter={(e) => showTip(geo, e)}
+                onMouseMove={(e) => showTip(geo, e)}
+                onMouseLeave={() => setTip(null)}
+                style={{
+                  default: { outline: "none" },
+                  hover: { outline: "none", fillOpacity: 0.82, cursor: "pointer" },
+                  pressed: { outline: "none" },
+                }}
+              />
+            );
+          })
+      }
+    </Geographies>
+  );
+
   return (
     <div className="space-y-6">
       {/* Indicator picker */}
@@ -134,7 +215,14 @@ export default function WorldMap({ countries, active = false, initialParams = nu
               </span>
             </div>
 
-            <div ref={wrapRef} className="relative mt-4">
+            {/* touchAction: "pan-y" (touch mode only) lets the browser keep one-finger
+                vertical page scrolling while two-finger gestures reach the map's
+                d3-zoom — see twoFingerOnly. Desktop gets no touch-action override. */}
+            <div
+              ref={wrapRef}
+              className="relative mt-4"
+              style={touchMode ? { touchAction: "pan-y" } : undefined}
+            >
               {loading && (
                 <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface/70 text-sm text-slate-500">
                   {t("state.loading")}
@@ -147,35 +235,34 @@ export default function WorldMap({ countries, active = false, initialParams = nu
                 style={{ width: "100%", height: "auto" }}
                 aria-label={indicatorLabel(indicator)}
               >
-                <Geographies geography={GEO_URL}>
-                  {({ geographies }) =>
-                    geographies
-                      .filter((geo) => geo.id !== ANTARCTICA_ID)
-                      .map((geo) => {
-                      const code = iso3ForGeo(geo);
-                      const datum = code ? valueMap.get(code) : null;
-                      const fill = datum ? scale.colorFor(datum.value) : mapColors.noData;
-                      return (
-                        <Geography
-                          key={geo.rsmKey}
-                          geography={geo}
-                          fill={fill}
-                          stroke={mapColors.border}
-                          strokeWidth={0.4}
-                          onMouseEnter={(e) => showTip(geo, e)}
-                          onMouseMove={(e) => showTip(geo, e)}
-                          onMouseLeave={() => setTip(null)}
-                          style={{
-                            default: { outline: "none" },
-                            hover: { outline: "none", fillOpacity: 0.82, cursor: "pointer" },
-                            pressed: { outline: "none" },
-                          }}
-                        />
-                      );
-                    })
-                  }
-                </Geographies>
+                {touchMode ? (
+                  <ZoomableGroup
+                    center={view.center}
+                    zoom={view.zoom}
+                    minZoom={MIN_ZOOM}
+                    maxZoom={MAX_ZOOM}
+                    translateExtent={[[0, 0], [MAP_W, MAP_H]]}
+                    filterZoomEvent={twoFingerOnly}
+                    onMoveEnd={({ coordinates, zoom }) => setView({ center: coordinates, zoom })}
+                  >
+                    {mapGeographies}
+                  </ZoomableGroup>
+                ) : (
+                  mapGeographies
+                )}
               </ComposableMap>
+
+              {/* Reset-zoom control: touch only, shown once zoomed/panned in. */}
+              {touchMode && zoomed && (
+                <button
+                  type="button"
+                  onClick={resetZoom}
+                  className="absolute right-2 top-2 z-20 inline-flex min-h-11 items-center gap-1.5 rounded-md border border-slate-200 bg-surface/95 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm backdrop-blur focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  <Maximize2 size={14} aria-hidden="true" />
+                  {t("map.resetZoom")}
+                </button>
+              )}
 
               {tip && (
                 <div
@@ -190,6 +277,11 @@ export default function WorldMap({ countries, active = false, initialParams = nu
                 </div>
               )}
             </div>
+
+            {/* Touch-only discoverability hint for the pinch gesture. */}
+            {touchMode && !zoomed && (
+              <p className="mt-3 text-xs text-slate-400">{t("map.pinchHint")}</p>
+            )}
 
             {ready && (
               <p className="mt-3 text-xs text-slate-500">

@@ -149,8 +149,6 @@ Europe" is ranked relative to Europe, not the world.
 
 ## Roadmap
 
-- **World-map year slider** _(deferred)_ — animate the choropleth across time instead
-  of showing only the latest value per country.
 - **Automated tests** — the pure logic modules (ranking, URL state, formatting,
   indicator/locale resolvers) are structured for unit testing but aren't covered yet.
 

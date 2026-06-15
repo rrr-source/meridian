@@ -46,6 +46,22 @@ export function isTapGesture(start, end, threshold = TAP_MOVE_PX) {
   return Math.hypot(end.x - start.x, end.y - start.y) <= threshold;
 }
 
+// Pan bounds (d3-zoom translateExtent) for a width×height map at the current zoom.
+// d3-zoom's viewport extent is the FULL viewBox (0,0)-(width,height), but the touch
+// map is drawn with preserveAspectRatio "slice", so the screen shows only a centered
+// sub-window of it. With a tight [[0,0],[w,h]] extent the user can never CENTER the
+// outer margin of width/(2·zoom) on each side, so the extreme corners (e.g. New
+// Zealand) stay unreachable. We pad the world box by exactly that half-viewport,
+// which shrinks as 1/zoom: the deeper you zoom, the more on-screen drag the same
+// world padding buys, so every edge stays centerable at any zoom without letting the
+// map drift off into unbounded blank space.
+export function panExtent(zoom, width, height) {
+  const k = Math.max(Number(zoom) || 1, 1); // never tighter than the zoom=1 box
+  const px = width / (2 * k);
+  const py = height / (2 * k);
+  return [[-px, -py], [width + px, height + py]];
+}
+
 // The WB ISO-3 code for a geography feature, or null if the basemap id isn't mapped.
 export function iso3ForGeo(geo) {
   return GEO_NUMERIC_TO_ISO3[geo.id] ?? null;

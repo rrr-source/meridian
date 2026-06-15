@@ -10,7 +10,7 @@ import { describeIndicator, searchIndicators, indicatorLabel } from "../lib/indi
 import { decodeMap, encodeMap, writeUrl } from "../lib/urlState";
 import { MAP_COLORS } from "../lib/theme";
 import { formatValue } from "../lib/format";
-import { GEO_URL, GEO_ISO3_SET, RAMP_FROM, RAMP_TO, iso3ForGeo, buildValueMap, makeColorScale, isTapGesture } from "../lib/worldMap";
+import { GEO_URL, GEO_ISO3_SET, RAMP_FROM, RAMP_TO, iso3ForGeo, buildValueMap, makeColorScale, isTapGesture, panExtent } from "../lib/worldMap";
 
 const SEARCH_DEBOUNCE_MS = 400;
 const DEFAULT_INDICATOR = describeIndicator(INDICATORS.gdppc.code); // GDP per capita
@@ -390,7 +390,7 @@ function MapStage({ indicator, valueMap, scale, mapColors, byId, loading, touchM
               zoom={view.zoom}
               minZoom={MIN_ZOOM}
               maxZoom={MAX_ZOOM}
-              translateExtent={[[0, 0], [MAP_W, MAP_H]]}
+              translateExtent={panExtent(view.zoom, MAP_W, MAP_H)}
               filterZoomEvent={fullscreen ? anyTouch : twoFingerOnly}
               onMoveEnd={({ coordinates, zoom }) => setView({ center: coordinates, zoom })}
             >

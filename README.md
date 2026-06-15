@@ -7,8 +7,6 @@ interactive map — all from live data, no API key required.
 
 ![Meridian screenshot](docs/screenshot.png)
 
-> _Screenshot placeholder — drop a real capture at `docs/screenshot.png`._
-
 ## Stack
 
 - [Vite](https://vitejs.dev/) + [React](https://react.dev/) (JavaScript)

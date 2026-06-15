@@ -10,7 +10,7 @@ import { describeIndicator, searchIndicators, indicatorLabel } from "../lib/indi
 import { decodeMap, encodeMap, writeUrl } from "../lib/urlState";
 import { MAP_COLORS } from "../lib/theme";
 import { formatValue } from "../lib/format";
-import { GEO_URL, GEO_ISO3_SET, RAMP_FROM, RAMP_TO, iso3ForGeo, buildValueMap, makeColorScale } from "../lib/worldMap";
+import { GEO_URL, GEO_ISO3_SET, RAMP_FROM, RAMP_TO, iso3ForGeo, buildValueMap, makeColorScale, isTapGesture } from "../lib/worldMap";
 
 const SEARCH_DEBOUNCE_MS = 400;
 const DEFAULT_INDICATOR = describeIndicator(INDICATORS.gdppc.code); // GDP per capita
@@ -276,11 +276,35 @@ function MapStage({ indicator, valueMap, scale, mapColors, byId, loading, touchM
   const [view, setView] = useState(DEFAULT_VIEW);
   const [tip, setTip] = useState(null); // { name, value, year, x, y }
   const wrapRef = useRef(null);
+  // Fullscreen pans on a single finger, so a country tap and a pan both begin as a
+  // one-finger touchstart. We record where the finger landed and, on touchend, decide:
+  // barely moved → tap (show the value); moved past the threshold → it was a pan.
+  // (Inline keeps the synthetic-mouse tap path: one finger never reaches d3-zoom there,
+  //  so the browser still emits mouseenter/click and the hover handlers fire as before.)
+  const tapStartRef = useRef(null);
   const zoomed = view.zoom > 1.01;
   const resetZoom = () => {
     setView(DEFAULT_VIEW);
     setTip(null);
   };
+
+  // Fullscreen-only tap detection on a country. d3-zoom preventDefaults the single
+  // touch (so it can pan), which suppresses the synthetic mouse events the hover
+  // tooltip relies on — these restore tap-to-show without eating the pan gesture.
+  const onGeoTouchStart = fullscreen
+    ? (e) => {
+        const t0 = e.touches?.[0];
+        tapStartRef.current = t0 ? { x: t0.clientX, y: t0.clientY } : null;
+      }
+    : undefined;
+  const onGeoTouchEnd = fullscreen
+    ? (geo) => (e) => {
+        const start = tapStartRef.current;
+        tapStartRef.current = null;
+        const end = e.changedTouches?.[0];
+        if (end && isTapGesture(start, { x: end.clientX, y: end.clientY })) showTip(geo, end);
+      }
+    : undefined;
 
   const showTip = (geo, e) => {
     const code = iso3ForGeo(geo);
@@ -317,6 +341,8 @@ function MapStage({ indicator, valueMap, scale, mapColors, byId, loading, touchM
                 onMouseEnter={(e) => showTip(geo, e)}
                 onMouseMove={(e) => showTip(geo, e)}
                 onMouseLeave={() => setTip(null)}
+                onTouchStart={onGeoTouchStart}
+                onTouchEnd={onGeoTouchEnd && onGeoTouchEnd(geo)}
                 style={{
                   default: { outline: "none" },
                   hover: { outline: "none", fillOpacity: 0.82, cursor: "pointer" },

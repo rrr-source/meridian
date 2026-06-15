@@ -33,6 +33,19 @@ function lerpColor(t) {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+// A touch counts as a TAP (vs. a pan/drag) when the finger moved less than this many
+// CSS pixels between touchstart and touchend. Used in the fullscreen map, where a
+// single finger pans the canvas, to tell a country tap apart from a panning gesture.
+export const TAP_MOVE_PX = 10;
+
+// True when the finger barely moved → treat as a tap (show the country's value),
+// false when it travelled past the threshold → it was a pan. `start`/`end` are
+// {x, y} client points; a missing point is never a tap (can't tell → don't fire).
+export function isTapGesture(start, end, threshold = TAP_MOVE_PX) {
+  if (!start || !end) return false;
+  return Math.hypot(end.x - start.x, end.y - start.y) <= threshold;
+}
+
 // The WB ISO-3 code for a geography feature, or null if the basemap id isn't mapped.
 export function iso3ForGeo(geo) {
   return GEO_NUMERIC_TO_ISO3[geo.id] ?? null;

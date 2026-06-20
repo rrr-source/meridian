@@ -44,6 +44,10 @@ export default function App() {
 
   const toggleTheme = () => setTheme((prev) => applyTheme(prev === "dark" ? "light" : "dark"));
 
+  useEffect(() => {
+    document.title = t("app.pageTitle");
+  }, [locale]);
+
   // Load the country list once; every mode reuses it.
   useEffect(() => {
     let alive = true;

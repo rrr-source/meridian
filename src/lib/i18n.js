@@ -15,6 +15,7 @@ const messages = {
   en: {
     "app.title": "Meridian",
     "app.subtitle": "An atlas of country development",
+    "app.pageTitle": "Meridian — an atlas of country development",
     "app.dataSource": "Data: World Bank Open Data",
 
     "nav.modes": "Modes",
@@ -109,6 +110,7 @@ const messages = {
   ru: {
     "app.title": "Meridian",
     "app.subtitle": "Атлас развития стран",
+    "app.pageTitle": "Meridian — атлас развития стран",
     "app.dataSource": "Данные: World Bank Open Data",
 
     "nav.modes": "Режимы",
